@@ -18,6 +18,9 @@ describe("resolveRefs", () => {
         },
       }
     )
+    expect(result.paths["/hello"].get.responses["200"].content["application/json"].schema.required).toEqual([
+      "message",
+    ])
   })
 
   it("rejects remote refs", async () => {

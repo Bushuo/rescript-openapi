@@ -115,7 +115,7 @@ function parseBlock(lines, startIndex, indent) {
       const itemText = line.slice(2)
       const item = parseSequenceItem(itemText)
       const child = parseChild(lines, index + 1, indent + 2)
-      container.push(mergeSequenceItem(item, child.value))
+      container.push(mergeSequenceItem(item, child.value, child.hasChild))
       index = child.index
       continue
     }
@@ -135,7 +135,7 @@ function parseBlock(lines, startIndex, indent) {
     const remainder = line.slice(colonIndex + 1).trim()
     if (!remainder) {
       const child = parseChild(lines, index + 1, indent + 2)
-      container[key] = child.value
+      container[key] = child.hasChild ? child.value : {}
       index = child.index
       continue
     }
@@ -161,13 +161,14 @@ function parseChild(lines, startIndex, indent) {
     }
 
     if (countIndent(line) < indent) {
-      return {value: {}, index}
+      return {value: null, hasChild: false, index}
     }
 
-    return parseBlock(lines, index, indent)
+    const parsed = parseBlock(lines, index, indent)
+    return {...parsed, hasChild: true}
   }
 
-  return {value: {}, index}
+  return {value: null, hasChild: false, index}
 }
 
 function parseScalar(value) {
@@ -225,7 +226,11 @@ function parseSequenceItem(itemText) {
   }
 }
 
-function mergeSequenceItem(item, childValue) {
+function mergeSequenceItem(item, childValue, hasChild) {
+  if (!hasChild) {
+    return item
+  }
+
   if (isPlainObject(item) && isPlainObject(childValue)) {
     return {...item, ...childValue}
   }
