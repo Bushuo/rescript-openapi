@@ -19,6 +19,10 @@ importers:
         version: 2.8.3
 
   packages/openapi-rescript-core:
+    dependencies:
+      '@rescript/runtime':
+        specifier: ^12.2.0
+        version: 12.2.0
     devDependencies:
       rescript:
         specifier: ^12.2.0

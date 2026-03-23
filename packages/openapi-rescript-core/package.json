@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "rescript": "^12.2.0"
+  },
+  "dependencies": {
+    "@rescript/runtime": "^12.2.0"
   }
 }
