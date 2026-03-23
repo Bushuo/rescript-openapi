@@ -10,13 +10,19 @@ const minimalFixture = JSON.parse(
   readFileSync(new URL("./fixtures/minimal.json", import.meta.url), "utf8"),
 )
 const packageDir = fileURLToPath(new URL("..", import.meta.url))
+const without = (object, key) => {
+  let copy = {...object}
+  delete copy[key]
+  return copy
+}
 
 describe("generate", () => {
-  it("returns a structured diagnostic for unsupported inputs", () => {
-    expect(generate({})).toMatchObject({
+  it("returns a root diagnostic for non-object inputs", () => {
+    expect(generate(null)).toMatchObject({
       ok: false,
       error: {
         path: [],
+        message: "Unsupported OpenAPI input",
       },
     })
   })
@@ -29,6 +35,46 @@ describe("generate", () => {
         version: "1.0.0",
         operations: [],
         schemas: [],
+      },
+    })
+  })
+
+  it("reports the openapi field path when openapi is missing", () => {
+    expect(generate(without(minimalFixture, "openapi"))).toMatchObject({
+      ok: false,
+      error: {
+        path: ["openapi"],
+        message: "Missing required field",
+      },
+    })
+  })
+
+  it("reports the info field path when info is missing", () => {
+    expect(generate(without(minimalFixture, "info"))).toMatchObject({
+      ok: false,
+      error: {
+        path: ["info"],
+        message: "Missing required field",
+      },
+    })
+  })
+
+  it("reports the paths field path when paths is missing", () => {
+    expect(generate(without(minimalFixture, "paths"))).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths"],
+        message: "Missing required field",
+      },
+    })
+  })
+
+  it("reports the openapi field path when openapi has the wrong type", () => {
+    expect(generate({...minimalFixture, openapi: 3.1})).toMatchObject({
+      ok: false,
+      error: {
+        path: ["openapi"],
+        message: "Expected string",
       },
     })
   })
