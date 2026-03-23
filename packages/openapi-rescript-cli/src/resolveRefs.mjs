@@ -1,5 +1,6 @@
 import {readFile} from "node:fs/promises"
-import {dirname, isAbsolute, resolve as resolvePath} from "node:path"
+import {dirname, resolve as resolvePath} from "node:path"
+import YAML from "yaml"
 
 const REF_REMOTE_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//
 
@@ -75,171 +76,7 @@ function parseDocument(contents, filePath) {
     return JSON.parse(text)
   }
 
-  return parseYaml(text)
-}
-
-function parseYaml(source) {
-  const lines = source.replace(/\r\n?/g, "\n").split("\n")
-  const {value} = parseBlock(lines, 0, 0)
-  return value
-}
-
-function parseBlock(lines, startIndex, indent) {
-  let index = startIndex
-  let container = null
-
-  while (index < lines.length) {
-    const rawLine = lines[index]
-    if (!rawLine || !rawLine.trim() || rawLine.trimStart().startsWith("#")) {
-      index += 1
-      continue
-    }
-
-    const currentIndent = countIndent(rawLine)
-    if (currentIndent < indent) {
-      break
-    }
-
-    if (currentIndent > indent) {
-      throw new Error(`Unexpected indentation at line ${index + 1}`)
-    }
-
-    const line = rawLine.slice(indent)
-    if (line.startsWith("- ")) {
-      if (container === null) {
-        container = []
-      } else if (!Array.isArray(container)) {
-        throw new Error(`Mixed YAML mapping and sequence at line ${index + 1}`)
-      }
-
-      const itemText = line.slice(2)
-      const item = parseSequenceItem(itemText)
-      const child = parseChild(lines, index + 1, indent + 2)
-      container.push(mergeSequenceItem(item, child.value, child.hasChild))
-      index = child.index
-      continue
-    }
-
-    if (container === null) {
-      container = {}
-    } else if (Array.isArray(container)) {
-      throw new Error(`Mixed YAML sequence and mapping at line ${index + 1}`)
-    }
-
-    const colonIndex = line.indexOf(":")
-    if (colonIndex === -1) {
-      throw new Error(`Invalid YAML line at ${index + 1}`)
-    }
-
-    const key = parseKey(line.slice(0, colonIndex).trim())
-    const remainder = line.slice(colonIndex + 1).trim()
-    if (!remainder) {
-      const child = parseChild(lines, index + 1, indent + 2)
-      container[key] = child.hasChild ? child.value : {}
-      index = child.index
-      continue
-    }
-
-    container[key] = parseScalar(remainder)
-    index += 1
-  }
-
-  if (container === null) {
-    container = {}
-  }
-
-  return {value: container, index}
-}
-
-function parseChild(lines, startIndex, indent) {
-  let index = startIndex
-  while (index < lines.length) {
-    const line = lines[index]
-    if (!line || !line.trim() || line.trimStart().startsWith("#")) {
-      index += 1
-      continue
-    }
-
-    if (countIndent(line) < indent) {
-      return {value: null, hasChild: false, index}
-    }
-
-    const parsed = parseBlock(lines, index, indent)
-    return {...parsed, hasChild: true}
-  }
-
-  return {value: null, hasChild: false, index}
-}
-
-function parseScalar(value) {
-  if (value === "null" || value === "~") {
-    return null
-  }
-
-  if (value === "true") {
-    return true
-  }
-
-  if (value === "false") {
-    return false
-  }
-
-  if (/^-?\d+(\.\d+)?$/.test(value)) {
-    return Number(value)
-  }
-
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1).replace(/\\"/g, '"').replace(/\\'/g, "'")
-  }
-
-  return value
-}
-
-function parseKey(value) {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1)
-  }
-
-  return value
-}
-
-function parseSequenceItem(itemText) {
-  if (!itemText.trim()) {
-    return {}
-  }
-
-  const colonIndex = itemText.indexOf(":")
-  if (colonIndex === -1) {
-    return parseScalar(itemText)
-  }
-
-  const key = parseKey(itemText.slice(0, colonIndex).trim())
-  const remainder = itemText.slice(colonIndex + 1).trim()
-  return {
-    [key]: remainder ? parseScalar(remainder) : {},
-  }
-}
-
-function mergeSequenceItem(item, childValue, hasChild) {
-  if (!hasChild) {
-    return item
-  }
-
-  if (isPlainObject(item) && isPlainObject(childValue)) {
-    return {...item, ...childValue}
-  }
-
-  if (isPlainObject(childValue)) {
-    return {...childValue}
-  }
-
-  return item
+  return YAML.parse(text)
 }
 
 function resolvePointer(document, fragment) {
@@ -267,12 +104,4 @@ function resolvePointer(document, fragment) {
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function countIndent(line) {
-  let indent = 0
-  while (indent < line.length && line[indent] === " ") {
-    indent += 1
-  }
-  return indent
 }

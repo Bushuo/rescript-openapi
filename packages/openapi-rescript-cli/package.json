@@ -2,6 +2,12 @@
   "name": "openapi-rescript-cli",
   "private": true,
   "version": "0.0.0",
+  "bin": {
+    "openapi-rescript": "./bin/openapi-rescript.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.3"
+  },
   "scripts": {
     "test": "cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-cli/test/*.test.mjs",
     "build": "node -e \"console.log('openapi-rescript-cli build placeholder')\"",

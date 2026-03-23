@@ -10,7 +10,7 @@ describe("normalizeOpenapi", () => {
           title: "Accepted",
           version: "1.0.0",
         },
-        paths: {},
+        webhooks: {},
       })
     ).toMatchObject({
       openapi: "3.1.9",
@@ -34,7 +34,11 @@ describe("normalizeOpenapi", () => {
     expect(() =>
       normalizeOpenapi({
         openapi: "3.1.0",
+        info: {
+          title: "Missing section",
+          version: "1.0.0",
+        },
       })
-    ).toThrow(/missing/i)
+    ).toThrow(/at least one of paths, components, or webhooks/i)
   })
 })
