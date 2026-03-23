@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "packageManager": "pnpm",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest run --passWithNoTests",
+    "check": "pnpm -r check"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}
