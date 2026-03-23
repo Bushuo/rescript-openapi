@@ -1,5 +1,9 @@
 {
   "name": "openapi-rescript-core",
   "private": true,
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "scripts": {
+    "build": "node -e \"console.log('openapi-rescript-core build placeholder')\"",
+    "check": "node -e \"console.log('openapi-rescript-core check placeholder')\""
+  }
 }

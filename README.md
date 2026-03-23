@@ -2,6 +2,11 @@
 
 pnpm workspace for the OpenAPI-to-ReScript generator.
 
+Bootstrap:
+
+- `pnpm install`
+- `pnpm test -- --runInBand`
+
 Packages:
 
 - `packages/openapi-rescript-cli`
