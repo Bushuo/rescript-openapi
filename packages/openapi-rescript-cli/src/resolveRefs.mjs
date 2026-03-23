@@ -113,15 +113,10 @@ function parseBlock(lines, startIndex, indent) {
       }
 
       const itemText = line.slice(2)
-      if (!itemText.trim()) {
-        const child = parseChild(lines, index + 1, indent + 2)
-        container.push(child.value)
-        index = child.index
-        continue
-      }
-
-      container.push(parseScalar(itemText))
-      index += 1
+      const item = parseSequenceItem(itemText)
+      const child = parseChild(lines, index + 1, indent + 2)
+      container.push(mergeSequenceItem(item, child.value))
+      index = child.index
       continue
     }
 
@@ -211,6 +206,35 @@ function parseKey(value) {
   }
 
   return value
+}
+
+function parseSequenceItem(itemText) {
+  if (!itemText.trim()) {
+    return {}
+  }
+
+  const colonIndex = itemText.indexOf(":")
+  if (colonIndex === -1) {
+    return parseScalar(itemText)
+  }
+
+  const key = parseKey(itemText.slice(0, colonIndex).trim())
+  const remainder = itemText.slice(colonIndex + 1).trim()
+  return {
+    [key]: remainder ? parseScalar(remainder) : {},
+  }
+}
+
+function mergeSequenceItem(item, childValue) {
+  if (isPlainObject(item) && isPlainObject(childValue)) {
+    return {...item, ...childValue}
+  }
+
+  if (isPlainObject(childValue)) {
+    return {...childValue}
+  }
+
+  return item
 }
 
 function resolvePointer(document, fragment) {

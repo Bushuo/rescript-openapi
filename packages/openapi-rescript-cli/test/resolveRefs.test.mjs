@@ -51,4 +51,43 @@ describe("resolveRefs", () => {
       rmSync(dir, {recursive: true, force: true})
     }
   })
+
+  it("parses sequence items with inline mappings and nested fields", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
+    const file = join(dir, "tags.yaml")
+
+    writeFileSync(
+      file,
+      [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Tags API",
+        "  version: 1.0.0",
+        "tags:",
+        "  - name: pets",
+        "    description: Pet operations",
+        "    externalDocs:",
+        "      description: More info",
+        "      url: https://example.com/docs",
+        "",
+      ].join("\n")
+    )
+
+    try {
+      const result = await resolveRefs(file)
+
+      expect(result.tags).toEqual([
+        {
+          name: "pets",
+          description: "Pet operations",
+          externalDocs: {
+            description: "More info",
+            url: "https://example.com/docs",
+          },
+        },
+      ])
+    } finally {
+      rmSync(dir, {recursive: true, force: true})
+    }
+  })
 })

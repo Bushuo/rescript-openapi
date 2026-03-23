@@ -29,6 +29,7 @@ describe("parseInput", () => {
             title: "JSON API",
             version: "1.0.0",
           },
+          paths: {},
         },
         null,
         2
@@ -43,6 +44,7 @@ describe("parseInput", () => {
         info: {
           title: "JSON API",
         },
+        paths: {},
       })
     } finally {
       rmSync(dir, {recursive: true, force: true})

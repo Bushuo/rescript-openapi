@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "test": "cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-cli/test/*.test.mjs",
     "build": "node -e \"console.log('openapi-rescript-cli build placeholder')\"",
     "check": "node -e \"console.log('openapi-rescript-cli check placeholder')\""
   }
