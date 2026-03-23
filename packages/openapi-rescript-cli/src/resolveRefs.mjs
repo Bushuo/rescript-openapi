@@ -43,6 +43,10 @@ async function resolveReference(ref, currentFilePath, cache, ancestry) {
     throw new Error(`Remote refs are not supported: ${ref}`)
   }
 
+  if (isUnsupportedAbsoluteUri(ref)) {
+    throw new Error(`Unsupported absolute ref: ${ref}`)
+  }
+
   const [fileRef, fragment = ""] = ref.split("#")
   const targetFilePath = fileRef ? resolvePath(dirname(currentFilePath), fileRef) : currentFilePath
   const targetKey = `${targetFilePath}#${fragment}`
@@ -104,4 +108,13 @@ function resolvePointer(document, fragment) {
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isUnsupportedAbsoluteUri(ref) {
+  try {
+    const parsed = new URL(ref)
+    return parsed.protocol !== "file:"
+  } catch {
+    return false
+  }
 }

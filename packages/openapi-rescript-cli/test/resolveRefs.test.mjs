@@ -55,6 +55,38 @@ describe("resolveRefs", () => {
     }
   })
 
+  it("rejects unsupported absolute URI refs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
+    const file = join(dir, "absolute-uri-ref.yaml")
+
+    writeFileSync(
+      file,
+      [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Absolute URI API",
+        "  version: 1.0.0",
+        "paths:",
+        "  /hello:",
+        "    get:",
+        "      responses:",
+        "        '200':",
+        "          description: OK",
+        "          content:",
+        "            application/json:",
+        "              schema:",
+        "                $ref: urn:example:foo",
+        "",
+      ].join("\n")
+    )
+
+    try {
+      await expect(resolveRefs(file)).rejects.toThrow(/unsupported.*ref/i)
+    } finally {
+      rmSync(dir, {recursive: true, force: true})
+    }
+  })
+
   it("parses sequence items with inline mappings and nested fields", async () => {
     const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
     const file = join(dir, "tags.yaml")
