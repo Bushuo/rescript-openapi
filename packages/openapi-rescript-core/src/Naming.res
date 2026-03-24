@@ -12,6 +12,8 @@ let isAsciiLetter = (char: string): bool =>
 
 let isDigit = (char: string): bool => char >= "0" && char <= "9"
 
+let isLowercaseLetter = (char: string): bool => char >= "a" && char <= "z"
+
 let isIdentifierChar = (char: string): bool => isAsciiLetter(char) || isDigit(char)
 
 let flushToken = (~tokens: ref<array<string>>, ~current: ref<string>) =>
@@ -50,16 +52,67 @@ let uppercaseHead = (token: string): string =>
     toUpperCase(charAt(token, 0)) ++ sliceFrom(token, 1)
   }
 
+let hasLowercaseLetter = (token: string): bool =>
+  Belt.Array.some(split(token, ""), isLowercaseLetter)
+
+let normalizeToken = (token: string): string =>
+  if hasLowercaseLetter(token) {
+    token
+  } else {
+    toLowerCase(token)
+  }
+
+let reservedIdentifiers = [
+  "and",
+  "as",
+  "assert",
+  "constraint",
+  "downto",
+  "else",
+  "exception",
+  "external",
+  "false",
+  "for",
+  "if",
+  "in",
+  "include",
+  "let",
+  "module",
+  "mutable",
+  "nonrec",
+  "of",
+  "open",
+  "or",
+  "private",
+  "rec",
+  "switch",
+  "to",
+  "true",
+  "try",
+  "type",
+  "when",
+  "while",
+  "with",
+]
+
+let makeCodegenSafeIdentifier = (identifier: string): string =>
+  if Belt.Array.some(reservedIdentifiers, reserved => reserved == identifier) {
+    identifier ++ "_"
+  } else {
+    identifier
+  }
+
 let makeIdentifier = (tokens: array<string>): string => {
   let filtered = Belt.Array.keep(tokens, token => token != "")
+  let normalizedTokens = Belt.Array.map(filtered, normalizeToken)
 
   let identifier =
-    switch Belt.Array.get(filtered, 0) {
+    switch Belt.Array.get(normalizedTokens, 0) {
     | None => "operation"
     | Some(first) =>
       let value = ref(lowercaseHead(first))
 
-      Belt.Array.forEachWithIndex(filtered, (index, token) => {
+      Belt.Array.forEachWithIndex(normalizedTokens, (index, token) => {
         if index > 0 {
           value.contents = value.contents ++ uppercaseHead(token)
         }
@@ -73,7 +126,7 @@ let makeIdentifier = (tokens: array<string>): string => {
   } else if isDigit(charAt(identifier, 0)) {
     "op" ++ uppercaseHead(identifier)
   } else {
-    identifier
+    makeCodegenSafeIdentifier(identifier)
   }
 }
 

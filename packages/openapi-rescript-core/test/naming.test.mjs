@@ -23,6 +23,58 @@ describe("naming and auth normalization", () => {
     ])
   })
 
+  it("normalizes all-uppercase tokens into stable lower-camel names", () => {
+    let uppercaseOperationId = {
+      openapi: "3.1.0",
+      info: {
+        title: "Uppercase Operation IDs API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/pets": {
+          get: {
+            operationId: "LIST_PETS",
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(uppercaseOperationId)
+    expect(output.ok).toBe(true)
+    expect(output.value.operations.map(operation => operation.name)).toEqual(["listPets"])
+  })
+
+  it("makes normalized operation names safe for ReScript codegen", () => {
+    let reservedWordOperationId = {
+      openapi: "3.1.0",
+      info: {
+        title: "Reserved Words API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/types": {
+          get: {
+            operationId: "type",
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(reservedWordOperationId)
+    expect(output.ok).toBe(true)
+    expect(output.value.operations.map(operation => operation.name)).toEqual(["type_"])
+  })
+
   it("derives stable operation names when operationId is missing or duplicated", () => {
     let output = generate(duplicateOperationIds)
 
