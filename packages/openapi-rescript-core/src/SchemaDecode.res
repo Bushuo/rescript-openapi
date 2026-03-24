@@ -35,6 +35,32 @@ let hasField = (schemaObject: dict<JSON.t>, name: string): bool =>
 let contains = (values: array<string>, target: string): bool =>
   Belt.Array.some(values, value => value == target)
 
+let unsupportedField = (
+  ~path: array<string>,
+  schemaObject: dict<JSON.t>,
+  name: string,
+): option<result<Ir.schema>> =>
+  if hasField(schemaObject, name) {
+    Some(unsupported(~path=at(path, name), ~feature=name))
+  } else {
+    None
+  }
+
+let rec firstUnsupportedField = (
+  ~path: array<string>,
+  schemaObject: dict<JSON.t>,
+  fields: array<string>,
+  ~index: int=0,
+): option<result<Ir.schema>> =>
+  if index >= Belt.Array.length(fields) {
+    None
+  } else {
+    switch unsupportedField(~path, schemaObject, Belt.Array.getExn(fields, index)) {
+    | Some(problem) => Some(problem)
+    | None => firstUnsupportedField(~path, schemaObject, fields, ~index=index + 1)
+    }
+  }
+
 let decodeStringArray = (~path: array<string>, json: JSON.t): result<array<string>> =>
   switch JSON.Decode.array(json) {
   | None => Error(Diagnostics.make(~path, ~message="Expected array"))
@@ -84,13 +110,30 @@ let rec decode = (~path: array<string>, json: JSON.t): result<Ir.schema> =>
   }
 
 and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir.schema> =>
-  if hasField(schemaObject, "oneOf") {
-    unsupported(~path, ~feature="oneOf")
-  } else if hasField(schemaObject, "anyOf") {
-    unsupported(~path, ~feature="anyOf")
-  } else if hasField(schemaObject, "allOf") {
-    unsupported(~path, ~feature="allOf")
-  } else {
+  switch firstUnsupportedField(
+    ~path,
+    schemaObject,
+    [
+      "oneOf",
+      "anyOf",
+      "allOf",
+      "enum",
+      "const",
+      "not",
+      "if",
+      "then",
+      "else",
+      "prefixItems",
+      "contains",
+      "patternProperties",
+      "propertyNames",
+      "dependentSchemas",
+      "discriminator",
+      "nullable",
+    ],
+  ) {
+  | Some(problem) => problem
+  | None =>
     switch Dict.get(schemaObject, "$ref") {
     | Some(_) => decodeRef(~path, schemaObject)
     | None =>

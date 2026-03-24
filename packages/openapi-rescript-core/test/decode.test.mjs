@@ -58,11 +58,72 @@ describe("decodeDocument", () => {
     expect(output.value.schemas.map(schema => schema.name)).toEqual(["Pet", "NewPet"])
   })
 
+  it("merges path-item parameters into operations", () => {
+    let withPathParameters = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          parameters: [
+            {
+              name: "tenantId",
+              in: "header",
+              required: true,
+              schema: {type: "string"},
+            },
+          ],
+        },
+      },
+    }
+
+    let output = generate(withPathParameters)
+    expect(output.ok).toBe(true)
+    expect(output.value.operations[0].parameters).toEqual([
+      {
+        name: "tenantId",
+        location: "header",
+        required: true,
+        schema: {TAG: "Scalar", _0: "string"},
+      },
+      {
+        name: "limit",
+        location: "query",
+        required: false,
+        schema: {TAG: "Scalar", _0: "integer"},
+      },
+    ])
+  })
+
   it("rejects unsupported schemas with a precise path", () => {
     expect(generate(normalizedUnsupported)).toMatchObject({
       ok: false,
       error: {
-        path: ["components", "schemas", "WeirdType"],
+        path: ["components", "schemas", "WeirdType", "oneOf"],
+      },
+    })
+  })
+
+  it("rejects unsupported schema keywords with precise paths", () => {
+    let unsupportedEnum = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        schemas: {
+          ...normalizedPetstore.components.schemas,
+          Pet: {
+            type: "string",
+            enum: ["cat"],
+          },
+        },
+      },
+    }
+
+    expect(generate(unsupportedEnum)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Pet", "enum"],
+        message: "Unsupported schema construct: enum",
       },
     })
   })

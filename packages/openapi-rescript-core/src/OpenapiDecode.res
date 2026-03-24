@@ -258,6 +258,7 @@ let decodeOperation = (
   ~routePath: string,
   ~method_: string,
   ~operationPath: array<string>,
+  ~inheritedParameters: array<Ir.parameter>,
   operationJson: JSON.t,
 ): result<Ir.operation> =>
   switch JSON.Decode.object(operationJson) {
@@ -277,7 +278,7 @@ let decodeOperation = (
         method: method_,
         path: routePath,
         tags,
-        parameters,
+        parameters: Belt.Array.concat(inheritedParameters, parameters),
         requestBody,
         responses,
         security,
@@ -308,26 +309,31 @@ let decodeOperations = (~path: array<string>, root: dict<JSON.t>): result<array<
         switch JSON.Decode.object(pathJson) {
         | None => error.contents = Some(Diagnostics.make(~path=["paths", routePath], ~message="Expected object"))
         | Some(pathObject) =>
-          Belt.Array.forEach(operationMethods, method_ =>
-            switch error.contents {
-            | Some(_) => ()
-            | None =>
-              switch Dict.get(pathObject, method_) {
-              | None => ()
-              | Some(operationJson) =>
-                switch decodeOperation(
-                  ~routePath,
-                  ~method_,
-                  ~operationPath=["paths", routePath, method_],
-                  operationJson,
-                ) {
-                | Ok(operation) =>
-                  operations.contents = Belt.Array.concat(operations.contents, [operation])
-                | Error(problem) => error.contents = Some(problem)
+          switch decodeParameters(~path=["paths", routePath], pathObject) {
+          | Error(problem) => error.contents = Some(problem)
+          | Ok(inheritedParameters) =>
+            Belt.Array.forEach(operationMethods, method_ =>
+              switch error.contents {
+              | Some(_) => ()
+              | None =>
+                switch Dict.get(pathObject, method_) {
+                | None => ()
+                | Some(operationJson) =>
+                  switch decodeOperation(
+                    ~routePath,
+                    ~method_,
+                    ~operationPath=["paths", routePath, method_],
+                    ~inheritedParameters,
+                    operationJson,
+                  ) {
+                  | Ok(operation) =>
+                    operations.contents = Belt.Array.concat(operations.contents, [operation])
+                  | Error(problem) => error.contents = Some(problem)
+                  }
                 }
               }
-            }
-          )
+            )
+          }
         }
       }
     )
