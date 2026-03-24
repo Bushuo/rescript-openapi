@@ -32,6 +32,8 @@ type response = {
   schema: option<schema>,
 }
 
+type securityRequirement = array<string>
+
 type operation = {
   operationId: option<string>,
   method: string,
@@ -40,12 +42,15 @@ type operation = {
   parameters: array<parameter>,
   requestBody: option<requestBody>,
   responses: array<response>,
-  security: array<string>,
+  security: array<securityRequirement>,
 }
 
 type securityScheme = {
   name: string,
   kind: string,
+  keyName: option<string>,
+  location: option<string>,
+  scheme: option<string>,
 }
 
 type document = {
@@ -53,7 +58,7 @@ type document = {
   title: string,
   version: string,
   tags: array<string>,
-  security: array<string>,
+  security: array<securityRequirement>,
   operations: array<operation>,
   schemas: array<namedSchema>,
   securitySchemes: array<securityScheme>,

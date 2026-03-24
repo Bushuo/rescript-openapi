@@ -41,46 +41,51 @@ let optionalStringArrayField = (~path: array<string>, dict: dict<JSON.t>, name: 
   | Some(value) => decodeStringArray(~path=at(path, name), value)
   }
 
-let decodeOptionalSchema = (~path: array<string>, contentObject: dict<JSON.t>): result<option<Ir.schema>> =>
-  switch Dict.get(contentObject, "application/json") {
-  | Some(contentJson) =>
-    switch JSON.Decode.object(contentJson) {
-    | None => Error(Diagnostics.make(~path=at(path, "application/json"), ~message="Expected object"))
-    | Some(applicationJson) =>
-      switch JsonDecode.requiredField(~path=at(path, "application/json"), applicationJson, "schema") {
-      | Ok(schemaJson) =>
-        switch SchemaDecode.decode(~path=at(at(path, "application/json"), "schema"), schemaJson) {
-        | Ok(schema) => Ok(Some(schema))
-        | Error(problem) => Error(problem)
-        }
-      | Error(problem) => Error(problem)
-      }
+let optionalStringField = (~path: array<string>, dict: dict<JSON.t>, name: string): result<option<string>> =>
+  switch Dict.get(dict, name) {
+  | None => Ok(None)
+  | Some(value) =>
+    switch JSON.Decode.string(value) {
+    | Some(text) => Ok(Some(text))
+    | None => Error(Diagnostics.make(~path=at(path, name), ~message="Expected string"))
     }
+  }
+
+let optionalBoolField = (~path: array<string>, dict: dict<JSON.t>, name: string): result<option<bool>> =>
+  switch Dict.get(dict, name) {
+  | None => Ok(None)
+  | Some(value) =>
+    switch JSON.Decode.bool(value) {
+    | Some(flag) => Ok(Some(flag))
+    | None => Error(Diagnostics.make(~path=at(path, name), ~message="Expected boolean"))
+    }
+  }
+
+let decodeSchemaFromContentEntry = (
+  ~path: array<string>,
+  contentType: string,
+  contentJson: JSON.t,
+): result<Ir.schema> =>
+  switch JSON.Decode.object(contentJson) {
+  | None => Error(Diagnostics.make(~path=at(path, contentType), ~message="Expected object"))
+  | Some(contentObject) =>
+    switch JsonDecode.requiredField(~path=at(path, contentType), contentObject, "schema") {
+    | Ok(schemaJson) => SchemaDecode.decode(~path=at(at(path, contentType), "schema"), schemaJson)
+    | Error(problem) => Error(problem)
+    }
+  }
+
+let decodeJsonSchema = (~path: array<string>, contentObject: dict<JSON.t>): result<Ir.schema> =>
+  switch Dict.get(contentObject, "application/json") {
+  | Some(contentJson) => decodeSchemaFromContentEntry(~path, "application/json", contentJson)
   | None =>
     switch Belt.Array.getBy(Dict.toArray(contentObject), entry =>
       switch entry {
       | (contentType, _) => String.endsWith(contentType, "+json")
       }
     ) {
-    | Some((contentType, contentJson)) =>
-      switch JSON.Decode.object(contentJson) {
-      | None => Error(Diagnostics.make(~path=at(path, contentType), ~message="Expected object"))
-      | Some(contentEntry) =>
-        switch JsonDecode.requiredField(~path=at(path, contentType), contentEntry, "schema") {
-        | Ok(schemaJson) =>
-          switch SchemaDecode.decode(~path=at(at(path, contentType), "schema"), schemaJson) {
-          | Ok(schema) => Ok(Some(schema))
-          | Error(problem) => Error(problem)
-          }
-        | Error(problem) => Error(problem)
-        }
-      }
-    | None =>
-      if Belt.Array.length(Dict.keysToArray(contentObject)) == 0 {
-        Ok(None)
-      } else {
-        Error(Diagnostics.make(~path, ~message="Only JSON media types are supported"))
-      }
+    | Some((contentType, contentJson)) => decodeSchemaFromContentEntry(~path, contentType, contentJson)
+    | None => Error(Diagnostics.make(~path, ~message="Only JSON media types are supported"))
     }
   }
 
@@ -91,26 +96,29 @@ let decodeRequestBody = (~path: array<string>, operationObject: dict<JSON.t>): r
     switch JSON.Decode.object(bodyJson) {
     | None => Error(Diagnostics.make(~path=at(path, "requestBody"), ~message="Expected object"))
     | Some(bodyObject) =>
-      let required =
-        switch Dict.get(bodyObject, "required")->Belt.Option.flatMap(JSON.Decode.bool) {
-        | Some(value) => value
-        | None => false
-        }
+      switch (
+        optionalBoolField(~path=at(path, "requestBody"), bodyObject, "required"),
+        JsonDecode.requiredField(~path=at(path, "requestBody"), bodyObject, "content"),
+      ) {
+      | (Ok(requiredValue), Ok(contentJson)) =>
+        let required =
+          switch requiredValue {
+          | Some(value) => value
+          | None => false
+          }
 
-      switch JsonDecode.requiredField(~path=at(path, "requestBody"), bodyObject, "content") {
-      | Ok(contentJson) =>
         switch JSON.Decode.object(contentJson) {
         | None => Error(Diagnostics.make(~path=at(at(path, "requestBody"), "content"), ~message="Expected object"))
         | Some(contentObject) =>
-          switch decodeOptionalSchema(~path=at(at(path, "requestBody"), "content"), contentObject) {
-          | Ok(Some(schema)) =>
+          switch decodeJsonSchema(~path=at(at(path, "requestBody"), "content"), contentObject) {
+          | Ok(schema) =>
             let requestBody: Ir.requestBody = {required, schema}
             Ok(Some(requestBody))
-          | Ok(None) => Ok(None)
           | Error(problem) => Error(problem)
           }
         }
-      | Error(problem) => Error(problem)
+      | (Error(problem), _) => Error(problem)
+      | (_, Error(problem)) => Error(problem)
       }
     }
   }
@@ -142,8 +150,8 @@ let decodeResponses = (~path: array<string>, operationObject: dict<JSON.t>): res
             | None =>
               error.contents = Some(Diagnostics.make(~path=at(responsePath, "content"), ~message="Expected object"))
             | Some(contentObject) =>
-              switch decodeOptionalSchema(~path=at(responsePath, "content"), contentObject) {
-              | Ok(schema) => append(schema)
+              switch decodeJsonSchema(~path=at(responsePath, "content"), contentObject) {
+              | Ok(schema) => append(Some(schema))
               | Error(problem) => error.contents = Some(problem)
               }
             }
@@ -173,13 +181,14 @@ let decodeParameters = (~path: array<string>, operationObject: dict<JSON.t>): re
           switch (
             JsonDecode.stringField(~path=parameterPath, parameterObject, "name"),
             JsonDecode.stringField(~path=parameterPath, parameterObject, "in"),
+            optionalBoolField(~path=parameterPath, parameterObject, "required"),
             JsonDecode.requiredField(~path=parameterPath, parameterObject, "schema"),
           ) {
-          | (Ok(name), Ok(location), Ok(schemaJson)) =>
+          | (Ok(name), Ok(location), Ok(requiredValue), Ok(schemaJson)) =>
             switch SchemaDecode.decode(~path=at(parameterPath, "schema"), schemaJson) {
             | Ok(schema) =>
               let required =
-                switch Dict.get(parameterObject, "required")->Belt.Option.flatMap(JSON.Decode.bool) {
+                switch requiredValue {
                 | Some(value) => value
                 | None => false
                 }
@@ -193,16 +202,21 @@ let decodeParameters = (~path: array<string>, operationObject: dict<JSON.t>): re
               Ok(parameter)
             | Error(problem) => Error(problem)
             }
-          | (Error(problem), _, _) => Error(problem)
-          | (_, Error(problem), _) => Error(problem)
-          | (_, _, Error(problem)) => Error(problem)
+          | (Error(problem), _, _, _) => Error(problem)
+          | (_, Error(problem), _, _) => Error(problem)
+          | (_, _, Error(problem), _) => Error(problem)
+          | (_, _, _, Error(problem)) => Error(problem)
           }
         }
       })
     }
   }
 
-let decodeSecurityNames = (~path: array<string>, source: dict<JSON.t>, name: string): result<array<string>> =>
+let decodeSecurityRequirements = (
+  ~path: array<string>,
+  source: dict<JSON.t>,
+  name: string,
+): result<array<Ir.securityRequirement>> =>
   switch Dict.get(source, name) {
   | None => Ok([])
   | Some(securityJson) =>
@@ -214,9 +228,16 @@ let decodeSecurityNames = (~path: array<string>, source: dict<JSON.t>, name: str
         switch JSON.Decode.object(entryJson) {
         | None => Error(Diagnostics.make(~path=entryPath, ~message="Expected object"))
         | Some(securityObject) =>
-          switch Belt.Array.get(Dict.keysToArray(securityObject), 0) {
-          | Some(securityName) => Ok(securityName)
-          | None => Error(Diagnostics.make(~path=entryPath, ~message="Expected security requirement"))
+          let entries = Dict.toArray(securityObject)
+          if Belt.Array.length(entries) == 0 {
+            Error(Diagnostics.make(~path=entryPath, ~message="Expected security requirement"))
+          } else {
+            collectArray(entries, ((securityName, requirementJson), _) =>
+              switch decodeStringArray(~path=at(entryPath, securityName), requirementJson) {
+              | Ok(_) => Ok(securityName)
+              | Error(problem) => Error(problem)
+              }
+            )
           }
         }
       })
@@ -232,16 +253,15 @@ let decodeOperation = (
   switch JSON.Decode.object(operationJson) {
   | None => Error(Diagnostics.make(~path=operationPath, ~message="Expected object"))
   | Some(operationObject) =>
-    let operationId = Dict.get(operationObject, "operationId")->Belt.Option.flatMap(JSON.Decode.string)
-
     switch (
+      optionalStringField(~path=operationPath, operationObject, "operationId"),
       optionalStringArrayField(~path=operationPath, operationObject, "tags"),
       decodeParameters(~path=operationPath, operationObject),
       decodeRequestBody(~path=operationPath, operationObject),
       decodeResponses(~path=operationPath, operationObject),
-      decodeSecurityNames(~path=operationPath, operationObject, "security"),
+      decodeSecurityRequirements(~path=operationPath, operationObject, "security"),
     ) {
-    | (Ok(tags), Ok(parameters), Ok(requestBody), Ok(responses), Ok(security)) =>
+    | (Ok(operationId), Ok(tags), Ok(parameters), Ok(requestBody), Ok(responses), Ok(security)) =>
       let operation: Ir.operation = {
         operationId,
         method: method_,
@@ -253,11 +273,12 @@ let decodeOperation = (
         security,
       }
       Ok(operation)
-    | (Error(problem), _, _, _, _) => Error(problem)
-    | (_, Error(problem), _, _, _) => Error(problem)
-    | (_, _, Error(problem), _, _) => Error(problem)
-    | (_, _, _, Error(problem), _) => Error(problem)
-    | (_, _, _, _, Error(problem)) => Error(problem)
+    | (Error(problem), _, _, _, _, _) => Error(problem)
+    | (_, Error(problem), _, _, _, _) => Error(problem)
+    | (_, _, Error(problem), _, _, _) => Error(problem)
+    | (_, _, _, Error(problem), _, _) => Error(problem)
+    | (_, _, _, _, Error(problem), _) => Error(problem)
+    | (_, _, _, _, _, Error(problem)) => Error(problem)
     }
   }
 
@@ -370,9 +391,38 @@ let decodeSecuritySchemes = (~path: array<string>, root: dict<JSON.t>): result<a
                 error.contents = Some(Diagnostics.make(~path=["components", "securitySchemes", name], ~message="Expected object"))
               | Some(schemeObject) =>
                 switch JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "type") {
+                | Ok("apiKey") =>
+                  switch (
+                    JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "name"),
+                    JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "in"),
+                  ) {
+                  | (Ok(keyName), Ok(location)) =>
+                    let scheme: Ir.securityScheme = {
+                      name,
+                      kind: "apiKey",
+                      keyName: Some(keyName),
+                      location: Some(location),
+                      scheme: None,
+                    }
+                    schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | (Error(problem), _) => error.contents = Some(problem)
+                  | (_, Error(problem)) => error.contents = Some(problem)
+                  }
+                | Ok("http") =>
+                  switch JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "scheme") {
+                  | Ok(httpScheme) =>
+                    let scheme: Ir.securityScheme = {
+                      name,
+                      kind: "http",
+                      keyName: None,
+                      location: None,
+                      scheme: Some(httpScheme),
+                    }
+                    schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | Error(problem) => error.contents = Some(problem)
+                  }
                 | Ok(kind) =>
-                  let scheme: Ir.securityScheme = {name, kind}
-                  schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  error.contents = Some(Diagnostics.make(~path=["components", "securitySchemes", name], ~message="Unsupported security scheme: " ++ kind))
                 | Error(problem) => error.contents = Some(problem)
                 }
               }
@@ -405,8 +455,8 @@ let decodeTags = (~path: array<string>, root: dict<JSON.t>): result<array<string
     }
   }
 
-let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<array<string>> =>
-  decodeSecurityNames(~path, root, "security")
+let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.securityRequirement>> =>
+  decodeSecurityRequirements(~path, root, "security")
 
 let decodeDocument = (input: JSON.t): result<Ir.document> =>
   switch JsonDecode.object(~path=[], input) {

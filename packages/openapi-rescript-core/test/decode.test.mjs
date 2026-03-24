@@ -17,8 +17,16 @@ describe("decodeDocument", () => {
     expect(output.value.title).toBe("Petstore")
     expect(output.value.version).toBe("1.0.0")
     expect(output.value.tags).toEqual(["pets"])
-    expect(output.value.security).toEqual(["ApiKeyAuth"])
-    expect(output.value.securitySchemes).toEqual([{name: "ApiKeyAuth", kind: "apiKey"}])
+    expect(output.value.security).toEqual([["ApiKeyAuth"]])
+    expect(output.value.securitySchemes).toEqual([
+      {
+        name: "ApiKeyAuth",
+        kind: "apiKey",
+        keyName: "X-API-Key",
+        location: "header",
+        scheme: undefined,
+      },
+    ])
     expect(output.value.operations.map(operation => operation.operationId)).toEqual([
       "listPets",
       "createPet",
@@ -77,5 +85,121 @@ describe("decodeDocument", () => {
     let output = generate(withoutOperationId)
     expect(output.ok).toBe(true)
     expect(output.value.operations[0].operationId).toBeUndefined()
+  })
+
+  it("rejects wrong-typed optional fields with precise paths", () => {
+    let wrongTypes = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          get: {
+            ...normalizedPetstore.paths["/pets"].get,
+            operationId: 123,
+          },
+        },
+      },
+    }
+
+    expect(generate(wrongTypes)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths", "/pets", "get", "operationId"],
+        message: "Expected string",
+      },
+    })
+  })
+
+  it("rejects wrong-typed optional booleans with precise paths", () => {
+    let wrongRequired = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          post: {
+            ...normalizedPetstore.paths["/pets"].post,
+            requestBody: {
+              ...normalizedPetstore.paths["/pets"].post.requestBody,
+              required: "yes",
+            },
+          },
+        },
+      },
+    }
+
+    expect(generate(wrongRequired)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths", "/pets", "post", "requestBody", "required"],
+        message: "Expected boolean",
+      },
+    })
+  })
+
+  it("rejects request bodies with no supported JSON media type", () => {
+    let emptyContent = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          post: {
+            ...normalizedPetstore.paths["/pets"].post,
+            requestBody: {
+              ...normalizedPetstore.paths["/pets"].post.requestBody,
+              content: {},
+            },
+          },
+        },
+      },
+    }
+
+    expect(generate(emptyContent)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths", "/pets", "post", "requestBody", "content"],
+        message: "Only JSON media types are supported",
+      },
+    })
+  })
+
+  it("rejects unsupported security scheme kinds", () => {
+    let unsupportedSecurity = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        securitySchemes: {
+          OAuth: {
+            type: "oauth2",
+          },
+        },
+      },
+      security: [{OAuth: []}],
+    }
+
+    expect(generate(unsupportedSecurity)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "securitySchemes", "OAuth"],
+        message: "Unsupported security scheme: oauth2",
+      },
+    })
+  })
+
+  it("rejects wrong-typed security requirement values", () => {
+    let invalidSecurityRequirement = {
+      ...normalizedPetstore,
+      security: [{ApiKeyAuth: true}],
+    }
+
+    expect(generate(invalidSecurityRequirement)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["security", "0", "ApiKeyAuth"],
+        message: "Expected array",
+      },
+    })
   })
 })
