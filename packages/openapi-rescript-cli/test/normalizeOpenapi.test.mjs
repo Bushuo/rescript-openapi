@@ -2,7 +2,7 @@ import {describe, expect, it} from "vitest"
 import {normalizeOpenapi} from "../src/normalizeOpenapi.mjs"
 
 describe("normalizeOpenapi", () => {
-  it("accepts OpenAPI 3.1.x documents", () => {
+  it("accepts OpenAPI 3.1.x documents with paths", () => {
     expect(
       normalizeOpenapi({
         openapi: "3.1.9",
@@ -10,6 +10,7 @@ describe("normalizeOpenapi", () => {
           title: "Accepted",
           version: "1.0.0",
         },
+        paths: {},
         webhooks: {},
       })
     ).toMatchObject({
@@ -30,15 +31,30 @@ describe("normalizeOpenapi", () => {
     ).toThrow(/openapi 3\.1/i)
   })
 
-  it("rejects minimal documents without the required top-level shape", () => {
-    expect(() =>
-      normalizeOpenapi({
+  it.each([
+    {
+      label: "components only",
+      document: {
         openapi: "3.1.0",
         info: {
-          title: "Missing section",
+          title: "Missing paths",
           version: "1.0.0",
         },
-      })
-    ).toThrow(/at least one of paths, components, or webhooks/i)
+        components: {},
+      },
+    },
+    {
+      label: "webhooks only",
+      document: {
+        openapi: "3.1.0",
+        info: {
+          title: "Missing paths",
+          version: "1.0.0",
+        },
+        webhooks: {},
+      },
+    },
+  ])("rejects $label documents without paths", ({document}) => {
+    expect(() => normalizeOpenapi(document)).toThrow(/must include a paths object/i)
   })
 })

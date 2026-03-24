@@ -11,11 +11,8 @@ export function normalizeOpenapi(document) {
     throw new Error("OpenAPI document is missing required info metadata")
   }
 
-  const hasDocumentSection =
-    isPlainObject(document.paths) || isPlainObject(document.components) || isPlainObject(document.webhooks)
-
-  if (!hasDocumentSection) {
-    throw new Error("OpenAPI document must include at least one of paths, components, or webhooks")
+  if (!isPlainObject(document.paths)) {
+    throw new Error("OpenAPI document must include a paths object")
   }
 
   return document
