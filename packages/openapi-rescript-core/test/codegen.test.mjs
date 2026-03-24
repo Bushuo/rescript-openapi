@@ -5,6 +5,9 @@ import {generate} from "../lib/js/src/OpenapiGenerator.bs.js"
 const normalizedPetstore = JSON.parse(
   readFileSync(new URL("./fixtures/petstore.normalized.json", import.meta.url), "utf8"),
 )
+const normalizedAuthenticatedApi = JSON.parse(
+  readFileSync(new URL("./fixtures/authenticated-api.normalized.json", import.meta.url), "utf8"),
+)
 
 const readGoldenFiles = fixtureName => {
   let fixtureDir = new URL(`./golden/${fixtureName}/`, import.meta.url)
@@ -170,5 +173,19 @@ describe("codegen", () => {
     expect(output.files.find(file => file.path === "Index.res")?.contents).toContain(
       "module PetStore2 = PetStore2",
     )
+  })
+
+  it("emits security scheme metadata into generated operations", () => {
+    let output = generate(normalizedAuthenticatedApi)
+    let defaultModule = output.files.find(file => file.path === "Default_.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(defaultModule).toContain("securitySchemes: [")
+    expect(defaultModule).toContain('name: "ApiKeyHeader"')
+    expect(defaultModule).toContain('credentialName: Some("X-API-Key")')
+    expect(defaultModule).toContain('name: "BearerAuth"')
+    expect(defaultModule).toContain('authKind: "httpBearer"')
+    expect(defaultModule).toContain('name: "BasicAuth"')
+    expect(defaultModule).toContain('authKind: "httpBasic"')
   })
 })

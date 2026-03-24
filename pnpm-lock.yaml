@@ -28,7 +28,21 @@ importers:
         specifier: ^12.2.0
         version: 12.2.0
 
-  packages/openapi-rescript-runtime: {}
+  packages/openapi-rescript-runtime:
+    dependencies:
+      '@glennsl/rescript-fetch':
+        specifier: 0.2.3
+        version: 0.2.3
+      '@rescript/runtime':
+        specifier: ^12.2.0
+        version: 12.2.0
+      sury:
+        specifier: 11.0.0-alpha.4
+        version: 11.0.0-alpha.4(rescript@12.2.0)
+    devDependencies:
+      rescript:
+        specifier: ^12.2.0
+        version: 12.2.0
 
 packages:
 
@@ -187,6 +201,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@glennsl/rescript-fetch@0.2.3':
+    resolution: {integrity: sha512-0MuaXeJHGii0/SKzR4ASB1Wal+ogdnNsD1K6HSTFUVc+TQzAZY+V8Nb7Z8K4OUqMJzmurIgVXNmirx3DC1Huyg==}
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
@@ -506,6 +523,14 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
+  sury@11.0.0-alpha.4:
+    resolution: {integrity: sha512-oeG/GJWZvQCKtGPpLbu0yCZudfr5LxycDo5kh7SJmKHDPCsEPJssIZL2Eb4Tl7g9aPEvIDuRrkS+L0pybsMEMA==}
+    peerDependencies:
+      rescript: 12.x
+    peerDependenciesMeta:
+      rescript:
+        optional: true
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -690,6 +715,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.4':
     optional: true
+
+  '@glennsl/rescript-fetch@0.2.3': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -978,6 +1005,10 @@ snapshots:
   strip-literal@3.1.0:
     dependencies:
       js-tokens: 9.0.1
+
+  sury@11.0.0-alpha.4(rescript@12.2.0):
+    optionalDependencies:
+      rescript: 12.2.0
 
   tinybench@2.9.0: {}
 

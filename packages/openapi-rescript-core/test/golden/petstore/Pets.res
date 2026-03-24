@@ -14,17 +14,25 @@ let listPetsOperation: Client.jsonOperation = {
       name: "limit",
       location: "query",
       required: false,
-      schema: Schemas.integer,
+      schema: OpenapiRescriptRuntime.Schema.toAny(Schemas.integer),
     },
   ],
   requestBody: None,
   responses: [
     {
       statusCode: "200",
-      schema: Some(Schemas.array(Schemas.pet)),
+      schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.array(Schemas.pet))),
     },
   ],
   security: [["ApiKeyAuth"]],
+  securitySchemes: [
+    {
+      name: "ApiKeyAuth",
+      authKind: "apiKey",
+      credentialName: Some("X-API-Key"),
+      location: Some("header"),
+    },
+  ],
 }
 
 let listPets = (
@@ -45,15 +53,23 @@ let createPetOperation: Client.jsonOperation = {
   parameters: [],
   requestBody: Some({
     required: true,
-    schema: Schemas.newPet,
+    schema: OpenapiRescriptRuntime.Schema.toAny(Schemas.newPet),
   }),
   responses: [
     {
       statusCode: "201",
-      schema: Some(Schemas.pet),
+      schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.pet)),
     },
   ],
   security: [["ApiKeyAuth"]],
+  securitySchemes: [
+    {
+      name: "ApiKeyAuth",
+      authKind: "apiKey",
+      credentialName: Some("X-API-Key"),
+      location: Some("header"),
+    },
+  ],
 }
 
 let createPet = (

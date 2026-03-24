@@ -80,7 +80,9 @@ let renderParameter = (parameter: Ir.parameter): array<string> => [
   "      name: " ++ Printer.quote(parameter.name) ++ ",",
   "      location: " ++ Printer.quote(parameter.location) ++ ",",
   "      required: " ++ Printer.boolLiteral(parameter.required) ++ ",",
-  "      schema: " ++ Printer.schemaExpr(~qualified=true, parameter.schema) ++ ",",
+  "      schema: OpenapiRescriptRuntime.Schema.toAny("
+  ++ Printer.schemaExpr(~qualified=true, parameter.schema)
+  ++ "),",
   "    },",
 ]
 
@@ -90,7 +92,9 @@ let renderRequestBody = (requestBody: option<Ir.requestBody>): array<string> =>
   | Some(body) => [
       "  requestBody: Some({",
       "    required: " ++ Printer.boolLiteral(body.required) ++ ",",
-      "    schema: " ++ Printer.schemaExpr(~qualified=true, body.schema) ++ ",",
+      "    schema: OpenapiRescriptRuntime.Schema.toAny("
+      ++ Printer.schemaExpr(~qualified=true, body.schema)
+      ++ "),",
       "  }),",
     ]
   }
@@ -99,7 +103,10 @@ let renderResponse = (response: Ir.response): array<string> => {
   let schemaLine =
     switch response.schema {
     | None => "None"
-    | Some(schema) => "Some(" ++ Printer.schemaExpr(~qualified=true, schema) ++ ")"
+    | Some(schema) =>
+      "Some(OpenapiRescriptRuntime.Schema.toAny("
+      ++ Printer.schemaExpr(~qualified=true, schema)
+      ++ "))"
     }
 
   [
@@ -110,6 +117,21 @@ let renderResponse = (response: Ir.response): array<string> => {
   ]
 }
 
+let optionStringLiteral = (value: option<string>): string =>
+  switch value {
+  | Some(value) => "Some(" ++ Printer.quote(value) ++ ")"
+  | None => "None"
+  }
+
+let renderSecurityScheme = (scheme: Ir.securityScheme): array<string> => [
+  "    {",
+  "      name: " ++ Printer.quote(scheme.name) ++ ",",
+  "      authKind: " ++ Printer.quote(scheme.authKind) ++ ",",
+  "      credentialName: " ++ optionStringLiteral(scheme.credentialName) ++ ",",
+  "      location: " ++ optionStringLiteral(scheme.location) ++ ",",
+  "    },",
+]
+
 let renderOperationValue = (~document: Ir.document, operation: Ir.operation): array<string> => {
   let parameterLines = ref([])
   Belt.Array.forEach(operation.parameters, parameter =>
@@ -119,6 +141,11 @@ let renderOperationValue = (~document: Ir.document, operation: Ir.operation): ar
   let responseLines = ref([])
   Belt.Array.forEach(operation.responses, response =>
     responseLines.contents = Belt.Array.concat(responseLines.contents, renderResponse(response))
+  )
+
+  let securitySchemeLines = ref([])
+  Belt.Array.forEach(document.securitySchemes, scheme =>
+    securitySchemeLines.contents = Belt.Array.concat(securitySchemeLines.contents, renderSecurityScheme(scheme))
   )
 
   Belt.Array.concatMany([
@@ -141,6 +168,15 @@ let renderOperationValue = (~document: Ir.document, operation: Ir.operation): ar
     responseLines.contents,
     ["  ],"],
     ["  security: " ++ Printer.stringMatrix(effectiveSecurity(~document, ~operation)) ++ ","],
+    if Belt.Array.length(securitySchemeLines.contents) == 0 {
+      ["  securitySchemes: [],"]
+    } else {
+      Belt.Array.concatMany([
+        ["  securitySchemes: ["],
+        securitySchemeLines.contents,
+        ["  ],"],
+      ])
+    },
     ["}"],
   ])
 }

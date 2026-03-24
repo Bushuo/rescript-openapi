@@ -2,35 +2,12 @@
 
 type t = OpenapiRescriptRuntime.Client.t
 type operationError = OpenapiRescriptRuntime.OperationError.t
-type schema<'value> = string
-
-type parameter = {
-  name: string,
-  location: string,
-  required: bool,
-  schema: string,
-}
-
-type requestBody = {
-  required: bool,
-  schema: string,
-}
-
-type response = {
-  statusCode: string,
-  schema: option<string>,
-}
-
-type jsonOperation = {
-  name: string,
-  method: string,
-  path: string,
-  tags: array<string>,
-  parameters: array<parameter>,
-  requestBody: option<requestBody>,
-  responses: array<response>,
-  security: array<array<string>>,
-}
+type schema<'value> = OpenapiRescriptRuntime.Schema.t<'value>
+type parameter = OpenapiRescriptRuntime.Client.parameter
+type requestBody = OpenapiRescriptRuntime.Client.requestBody
+type response = OpenapiRescriptRuntime.Client.response
+type securityScheme = OpenapiRescriptRuntime.Client.securityScheme
+type jsonOperation = OpenapiRescriptRuntime.Client.jsonOperation
 
 let make = OpenapiRescriptRuntime.Client.make
 let callJson = OpenapiRescriptRuntime.Client.callJson
