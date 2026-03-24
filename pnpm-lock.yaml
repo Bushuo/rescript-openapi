@@ -14,9 +14,9 @@ importers:
 
   packages/openapi-rescript-cli:
     dependencies:
-      openapi-rescript-core:
-        specifier: file:../openapi-rescript-core
-        version: link:../openapi-rescript-core
+      '@rescript/runtime':
+        specifier: ^12.2.0
+        version: 12.2.0
       yaml:
         specifier: ^2.8.3
         version: 2.8.3

@@ -1,11 +1,19 @@
-import {mkdir, writeFile} from "node:fs/promises"
+import {mkdir, readFile, rm, writeFile} from "node:fs/promises"
 import {dirname, join} from "node:path"
 import {parseInput} from "./parseInput.mjs"
-import * as OpenapiGenerator from "openapi-rescript-core/lib/js/src/OpenapiGenerator.bs.js"
+
+const manifestName = ".openapi-rescript-generated.json"
+const generatorImportPaths = [
+  "../vendor/openapi-rescript-core/lib/js/src/OpenapiGenerator.bs.js",
+  "../../openapi-rescript-core/lib/js/src/OpenapiGenerator.bs.js",
+]
+
+let generatorPromise
 
 export async function runCore(entryPath, targetDir = process.cwd()) {
   try {
     const normalized = await parseInput(entryPath)
+    const OpenapiGenerator = await loadGenerator()
     const output = OpenapiGenerator.generate(normalized)
 
     if (!output.ok) {
@@ -15,7 +23,7 @@ export async function runCore(entryPath, targetDir = process.cwd()) {
       }
     }
 
-    await writeGeneratedFiles(output.files, targetDir)
+    await syncGeneratedFiles(targetDir, output.files)
 
     return {
       ok: true,
@@ -32,6 +40,36 @@ export async function runCore(entryPath, targetDir = process.cwd()) {
   }
 }
 
+async function loadGenerator() {
+  if (!generatorPromise) {
+    generatorPromise = importGenerator()
+  }
+
+  return generatorPromise
+}
+
+async function importGenerator() {
+  for (const specifier of generatorImportPaths) {
+    try {
+      return await import(specifier)
+    } catch {
+      // Try the next location.
+    }
+  }
+
+  throw new Error("Unable to load the compiled OpenAPI generator")
+}
+
+async function syncGeneratedFiles(targetDir, files) {
+  const manifestPath = join(targetDir, manifestName)
+  const previousFiles = await readManifest(manifestPath)
+  const currentPaths = files.map((file) => file.path)
+
+  await writeGeneratedFiles(files, targetDir)
+  await removeStaleFiles(targetDir, previousFiles, currentPaths)
+  await writeManifest(manifestPath, currentPaths)
+}
+
 async function writeGeneratedFiles(files, targetDir) {
   await mkdir(targetDir, {recursive: true})
 
@@ -40,4 +78,33 @@ async function writeGeneratedFiles(files, targetDir) {
     await mkdir(dirname(outputPath), {recursive: true})
     await writeFile(outputPath, file.contents, "utf8")
   }
+}
+
+async function readManifest(manifestPath) {
+  try {
+    const contents = await readFile(manifestPath, "utf8")
+    const parsed = JSON.parse(contents)
+
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter((value) => typeof value === "string")
+  } catch {
+    return []
+  }
+}
+
+async function removeStaleFiles(targetDir, previousFiles, currentPaths) {
+  const currentSet = new Set(currentPaths)
+
+  for (const stalePath of previousFiles) {
+    if (!currentSet.has(stalePath)) {
+      await rm(join(targetDir, stalePath), {force: true, recursive: true})
+    }
+  }
+}
+
+async function writeManifest(manifestPath, currentPaths) {
+  await writeFile(manifestPath, `${JSON.stringify(currentPaths, null, 2)}\n`, "utf8")
 }
