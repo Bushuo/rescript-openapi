@@ -1,0 +1,89 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Authenticated API",
+    "version": "1.0.0"
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/profile": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated profile"
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authenticated session"
+          }
+        }
+      }
+    },
+    "/admin": {
+      "get": {
+        "security": [
+          {
+            "ApiKeyHeader": []
+          },
+          {
+            "ApiKeyQuery": []
+          },
+          {
+            "ApiKeyCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Protected admin route"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "name": "X-API-Key",
+        "in": "header"
+      },
+      "ApiKeyQuery": {
+        "type": "apiKey",
+        "name": "api_key",
+        "in": "query"
+      },
+      "ApiKeyCookie": {
+        "type": "apiKey",
+        "name": "session",
+        "in": "cookie"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "BasicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    }
+  }
+}

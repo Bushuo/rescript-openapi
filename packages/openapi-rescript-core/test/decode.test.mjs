@@ -21,16 +21,13 @@ describe("decodeDocument", () => {
     expect(output.value.securitySchemes).toEqual([
       {
         name: "ApiKeyAuth",
-        kind: "apiKey",
-        keyName: "X-API-Key",
+        authKind: "apiKey",
+        credentialName: "X-API-Key",
         location: "header",
-        scheme: undefined,
       },
     ])
-    expect(output.value.operations.map(operation => operation.operationId)).toEqual([
-      "listPets",
-      "createPet",
-    ])
+    expect(output.value.operations.map(operation => operation.operationId)).toEqual(["listPets", "createPet"])
+    expect(output.value.operations.map(operation => operation.name)).toEqual(["listPets", "createPet"])
     expect(output.value.operations[0].parameters).toEqual([
       {
         name: "limit",
@@ -159,7 +156,7 @@ describe("decodeDocument", () => {
     })
   })
 
-  it("allows operations without operationId so later tasks can normalize names", () => {
+  it("derives fallback names for operations without operationId", () => {
     let withoutOperationId = {
       ...normalizedPetstore,
       paths: {
@@ -177,6 +174,7 @@ describe("decodeDocument", () => {
     let output = generate(withoutOperationId)
     expect(output.ok).toBe(true)
     expect(output.value.operations[0].operationId).toBeUndefined()
+    expect(output.value.operations[0].name).toBe("getPets")
   })
 
   it("rejects wrong-typed optional fields with precise paths", () => {
@@ -274,7 +272,7 @@ describe("decodeDocument", () => {
     expect(generate(unsupportedSecurity)).toMatchObject({
       ok: false,
       error: {
-        path: ["components", "securitySchemes", "OAuth"],
+        path: ["components", "securitySchemes", "OAuth", "type"],
         message: "Unsupported security scheme: oauth2",
       },
     })
@@ -328,7 +326,7 @@ describe("decodeDocument", () => {
     expect(generate(unsupportedHttpScheme)).toMatchObject({
       ok: false,
       error: {
-        path: ["components", "securitySchemes", "HttpAuth"],
+        path: ["components", "securitySchemes", "HttpAuth", "scheme"],
         message: "Unsupported HTTP auth scheme: digest",
       },
     })

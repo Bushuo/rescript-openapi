@@ -36,6 +36,7 @@ type securityRequirement = array<string>
 
 type operation = {
   operationId: option<string>,
+  name: string,
   method: string,
   path: string,
   tags: array<string>,
@@ -47,10 +48,9 @@ type operation = {
 
 type securityScheme = {
   name: string,
-  kind: string,
-  keyName: option<string>,
+  authKind: string,
+  credentialName: option<string>,
   location: option<string>,
-  scheme: option<string>,
 }
 
 type document = {

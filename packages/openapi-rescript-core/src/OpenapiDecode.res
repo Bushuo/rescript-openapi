@@ -291,6 +291,7 @@ let decodeOperation = (
     | (Ok(operationId), Ok(tags), Ok(parameters), Ok(requestBody), Ok(responses), Ok(security)) =>
       let operation: Ir.operation = {
         operationId,
+        name: "",
         method: method_,
         path: routePath,
         tags,
@@ -422,55 +423,82 @@ let decodeSecuritySchemes = (~path: array<string>, root: dict<JSON.t>): result<a
               | None =>
                 error.contents = Some(Diagnostics.make(~path=["components", "securitySchemes", name], ~message="Expected object"))
               | Some(schemeObject) =>
-                switch JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "type") {
+                let schemePath = ["components", "securitySchemes", name]
+
+                switch JsonDecode.stringField(~path=schemePath, schemeObject, "type") {
                 | Ok("apiKey") =>
                   switch (
-                    JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "name"),
-                    JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "in"),
+                    JsonDecode.stringField(~path=schemePath, schemeObject, "name"),
+                    JsonDecode.stringField(~path=schemePath, schemeObject, "in"),
                   ) {
-                  | (Ok(keyName), Ok(location)) =>
+                  | (Ok(credentialName), Ok("header")) =>
                     let scheme: Ir.securityScheme = {
                       name,
-                      kind: "apiKey",
-                      keyName: Some(keyName),
-                      location: Some(location),
-                      scheme: None,
+                      authKind: "apiKey",
+                      credentialName: Some(credentialName),
+                      location: Some("header"),
                     }
                     schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | (Ok(credentialName), Ok("query")) =>
+                    let scheme: Ir.securityScheme = {
+                      name,
+                      authKind: "apiKey",
+                      credentialName: Some(credentialName),
+                      location: Some("query"),
+                    }
+                    schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | (Ok(credentialName), Ok("cookie")) =>
+                    let scheme: Ir.securityScheme = {
+                      name,
+                      authKind: "apiKey",
+                      credentialName: Some(credentialName),
+                      location: Some("cookie"),
+                    }
+                    schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | (Ok(_), Ok(location)) =>
+                    error.contents = Some(
+                      Diagnostics.make(
+                        ~path=Belt.Array.concat(schemePath, ["in"]),
+                        ~message="Unsupported apiKey location: " ++ location,
+                      ),
+                    )
                   | (Error(problem), _) => error.contents = Some(problem)
                   | (_, Error(problem)) => error.contents = Some(problem)
                   }
                 | Ok("http") =>
-                  switch JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "scheme") {
+                  switch JsonDecode.stringField(~path=schemePath, schemeObject, "scheme") {
                   | Ok("basic") =>
                     let scheme: Ir.securityScheme = {
                       name,
-                      kind: "http",
-                      keyName: None,
+                      authKind: "httpBasic",
+                      credentialName: None,
                       location: None,
-                      scheme: Some("basic"),
                     }
                     schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
                   | Ok("bearer") =>
                     let scheme: Ir.securityScheme = {
                       name,
-                      kind: "http",
-                      keyName: None,
+                      authKind: "httpBearer",
+                      credentialName: None,
                       location: None,
-                      scheme: Some("bearer"),
                     }
                     schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
                   | Ok(httpScheme) =>
                     error.contents = Some(
                       Diagnostics.make(
-                        ~path=["components", "securitySchemes", name],
+                        ~path=Belt.Array.concat(schemePath, ["scheme"]),
                         ~message="Unsupported HTTP auth scheme: " ++ httpScheme,
                       ),
                     )
                   | Error(problem) => error.contents = Some(problem)
                   }
                 | Ok(kind) =>
-                  error.contents = Some(Diagnostics.make(~path=["components", "securitySchemes", name], ~message="Unsupported security scheme: " ++ kind))
+                  error.contents = Some(
+                    Diagnostics.make(
+                      ~path=Belt.Array.concat(schemePath, ["type"]),
+                      ~message="Unsupported security scheme: " ++ kind,
+                    ),
+                  )
                 | Error(problem) => error.contents = Some(problem)
                 }
               }
@@ -528,17 +556,21 @@ let decodeDocument = (input: JSON.t): result<Ir.document> =>
           JsonDecode.stringField(~path=["info"], info, "version"),
         ) {
         | (Ok(title), Ok(version)) =>
-          let document: Ir.document = {
-            openapiVersion,
-            title,
-            version,
-            tags,
-            security,
-            operations,
-            schemas,
-            securitySchemes,
+          switch Naming.normalizeOperations(operations) {
+          | Error(problem) => Error(problem)
+          | Ok(operations) =>
+            let document: Ir.document = {
+              openapiVersion,
+              title,
+              version,
+              tags,
+              security,
+              operations,
+              schemas,
+              securitySchemes,
+            }
+            Ok(document)
           }
-          Ok(document)
         | (Error(problem), _) => Error(problem)
         | (_, Error(problem)) => Error(problem)
         }
