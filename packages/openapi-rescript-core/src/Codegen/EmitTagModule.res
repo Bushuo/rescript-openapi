@@ -1,9 +1,12 @@
 let paramsTypeName = (operation: Ir.operation): string => operation.name ++ "Params"
 
-let primaryTag = (operation: Ir.operation): string =>
-  switch Belt.Array.get(operation.tags, 0) {
-  | Some(tag) => tag
-  | None => "default"
+let defaultTag = "default"
+
+let operationTags = (operation: Ir.operation): array<string> =>
+  if Belt.Array.length(operation.tags) > 0 {
+    operation.tags
+  } else {
+    [defaultTag]
   }
 
 let isSuccessStatus = (statusCode: string): bool =>
@@ -90,7 +93,7 @@ let renderRequestBody = (requestBody: option<Ir.requestBody>): array<string> =>
 let renderResponse = (response: Ir.response): array<string> => {
   let schemaLine =
     switch response.schema {
-    | None => "Some(\"unit\")"
+    | None => "None"
     | Some(schema) => "Some(" ++ Printer.schemaExpr(~qualified=true, schema) ++ ")"
     }
 
@@ -154,18 +157,28 @@ let renderOperation = (~document: Ir.document, operation: Ir.operation): array<s
     renderOperationFunction(operation),
   ])
 
-let collectPrimaryTags = (document: Ir.document): array<string> => {
+let collectTags = (document: Ir.document): array<string> => {
   let tags = ref([])
 
-  Belt.Array.forEach(document.operations, operation => {
-    let tag = primaryTag(operation)
+  Belt.Array.forEach(document.tags, tag => {
     if !Belt.Array.some(tags.contents, existing => existing == tag) {
       tags.contents = Belt.Array.concat(tags.contents, [tag])
     }
   })
 
+  Belt.Array.forEach(document.operations, operation => {
+    Belt.Array.forEach(operationTags(operation), tag => {
+      if !Belt.Array.some(tags.contents, existing => existing == tag) {
+        tags.contents = Belt.Array.concat(tags.contents, [tag])
+      }
+    })
+  })
+
   tags.contents
 }
+
+let operationHasTag = (~tag: string, ~operation: Ir.operation): bool =>
+  Belt.Array.some(operationTags(operation), operationTag => operationTag == tag)
 
 let emitForTag = (~document: Ir.document, ~tag: string, ~operations: array<Ir.operation>): Printer.file => {
   let body = ref([])
@@ -188,11 +201,11 @@ let emitForTag = (~document: Ir.document, ~tag: string, ~operations: array<Ir.op
 }
 
 let emitAll = (document: Ir.document): array<Printer.file> => {
-  let tags = collectPrimaryTags(document)
+  let tags = collectTags(document)
   let files = ref([])
 
   Belt.Array.forEach(tags, tag => {
-    let operations = Belt.Array.keep(document.operations, operation => primaryTag(operation) == tag)
+    let operations = Belt.Array.keep(document.operations, operation => operationHasTag(~tag, ~operation))
     files.contents = Belt.Array.concat(files.contents, [emitForTag(~document, ~tag, ~operations)])
   })
 
@@ -200,4 +213,4 @@ let emitAll = (document: Ir.document): array<Printer.file> => {
 }
 
 let moduleNames = (document: Ir.document): array<string> =>
-  Belt.Array.map(collectPrimaryTags(document), Printer.moduleName)
+  Belt.Array.map(collectTags(document), Printer.moduleName)
