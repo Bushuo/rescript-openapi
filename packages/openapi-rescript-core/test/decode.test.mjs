@@ -202,4 +202,43 @@ describe("decodeDocument", () => {
       },
     })
   })
+
+  it("rejects scoped security requirement arrays", () => {
+    let scopedSecurityRequirement = {
+      ...normalizedPetstore,
+      security: [{ApiKeyAuth: ["admin"]}],
+    }
+
+    expect(generate(scopedSecurityRequirement)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["security", "0", "ApiKeyAuth"],
+        message: "Only empty security requirement arrays are supported",
+      },
+    })
+  })
+
+  it("rejects unsupported HTTP auth schemes", () => {
+    let unsupportedHttpScheme = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        securitySchemes: {
+          HttpAuth: {
+            type: "http",
+            scheme: "digest",
+          },
+        },
+      },
+      security: [{HttpAuth: []}],
+    }
+
+    expect(generate(unsupportedHttpScheme)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "securitySchemes", "HttpAuth"],
+        message: "Unsupported HTTP auth scheme: digest",
+      },
+    })
+  })
 })

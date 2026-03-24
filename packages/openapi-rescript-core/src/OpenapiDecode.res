@@ -234,7 +234,17 @@ let decodeSecurityRequirements = (
           } else {
             collectArray(entries, ((securityName, requirementJson), _) =>
               switch decodeStringArray(~path=at(entryPath, securityName), requirementJson) {
-              | Ok(_) => Ok(securityName)
+              | Ok(requirements) =>
+                if Belt.Array.length(requirements) == 0 {
+                  Ok(securityName)
+                } else {
+                  Error(
+                    Diagnostics.make(
+                      ~path=at(entryPath, securityName),
+                      ~message="Only empty security requirement arrays are supported",
+                    ),
+                  )
+                }
               | Error(problem) => Error(problem)
               }
             )
@@ -410,15 +420,31 @@ let decodeSecuritySchemes = (~path: array<string>, root: dict<JSON.t>): result<a
                   }
                 | Ok("http") =>
                   switch JsonDecode.stringField(~path=["components", "securitySchemes", name], schemeObject, "scheme") {
-                  | Ok(httpScheme) =>
+                  | Ok("basic") =>
                     let scheme: Ir.securityScheme = {
                       name,
                       kind: "http",
                       keyName: None,
                       location: None,
-                      scheme: Some(httpScheme),
+                      scheme: Some("basic"),
                     }
                     schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | Ok("bearer") =>
+                    let scheme: Ir.securityScheme = {
+                      name,
+                      kind: "http",
+                      keyName: None,
+                      location: None,
+                      scheme: Some("bearer"),
+                    }
+                    schemes.contents = Belt.Array.concat(schemes.contents, [scheme])
+                  | Ok(httpScheme) =>
+                    error.contents = Some(
+                      Diagnostics.make(
+                        ~path=["components", "securitySchemes", name],
+                        ~message="Unsupported HTTP auth scheme: " ++ httpScheme,
+                      ),
+                    )
                   | Error(problem) => error.contents = Some(problem)
                   }
                 | Ok(kind) =>
