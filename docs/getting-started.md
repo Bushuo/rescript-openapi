@@ -61,7 +61,7 @@ pnpm test -- --runInBand
 Generated clients import the shared runtime package and its schema/HTTP dependencies:
 
 - `openapi-rescript-runtime`
-- `rescript-fetch`
+- `@glennsl/rescript-fetch`
 - `sury@11.0.0-alpha.4`
 
 ## Supported Subset
@@ -73,6 +73,7 @@ V1 supports a strict subset of OpenAPI 3.1:
 - local file `$ref`s only
 - tags, operations, parameters, request bodies, JSON responses, status codes, and security declarations
 - JSON media types only, including `application/json` and `application/*+json`
+- auth support limited to `apiKey` in header/query/cookie plus `http` basic and bearer schemes
 
 Unsupported constructs are rejected instead of being approximated.
 
@@ -86,5 +87,6 @@ On failure it:
 - writes a structured JSON diagnostic to stderr
 - does not emit partial generated output
 
-For example, `fixtures/specs/unsupported-schema.yaml` intentionally fails because the schema uses `oneOf`, which is currently unsupported in this generator subset.
+The CLI also writes `.openapi-rescript-generated.json` in the output directory so later runs can track which files were generated and clean up stale artifacts safely.
 
+For example, `fixtures/specs/unsupported-schema.yaml` intentionally fails because the schema uses `oneOf`, which is currently unsupported in this generator subset.

@@ -21,6 +21,5 @@ node packages/openapi-rescript-cli/bin/openapi-rescript.mjs fixtures/specs/petst
 Generated clients depend on:
 
 - `openapi-rescript-runtime`
-- `rescript-fetch`
+- `@glennsl/rescript-fetch`
 - `sury@11.0.0-alpha.4`
-
