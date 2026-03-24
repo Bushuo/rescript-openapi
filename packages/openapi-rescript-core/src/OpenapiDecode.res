@@ -56,7 +56,32 @@ let decodeOptionalSchema = (~path: array<string>, contentObject: dict<JSON.t>): 
       | Error(problem) => Error(problem)
       }
     }
-  | None => Ok(None)
+  | None =>
+    switch Belt.Array.getBy(Dict.toArray(contentObject), entry =>
+      switch entry {
+      | (contentType, _) => String.endsWith(contentType, "+json")
+      }
+    ) {
+    | Some((contentType, contentJson)) =>
+      switch JSON.Decode.object(contentJson) {
+      | None => Error(Diagnostics.make(~path=at(path, contentType), ~message="Expected object"))
+      | Some(contentEntry) =>
+        switch JsonDecode.requiredField(~path=at(path, contentType), contentEntry, "schema") {
+        | Ok(schemaJson) =>
+          switch SchemaDecode.decode(~path=at(at(path, contentType), "schema"), schemaJson) {
+          | Ok(schema) => Ok(Some(schema))
+          | Error(problem) => Error(problem)
+          }
+        | Error(problem) => Error(problem)
+        }
+      }
+    | None =>
+      if Belt.Array.length(Dict.keysToArray(contentObject)) == 0 {
+        Ok(None)
+      } else {
+        Error(Diagnostics.make(~path, ~message="Only JSON media types are supported"))
+      }
+    }
   }
 
 let decodeRequestBody = (~path: array<string>, operationObject: dict<JSON.t>): result<option<Ir.requestBody>> =>
@@ -380,6 +405,9 @@ let decodeTags = (~path: array<string>, root: dict<JSON.t>): result<array<string
     }
   }
 
+let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<array<string>> =>
+  decodeSecurityNames(~path, root, "security")
+
 let decodeDocument = (input: JSON.t): result<Ir.document> =>
   switch JsonDecode.object(~path=[], input) {
   | Error(_) => Error(Diagnostics.root("Unsupported OpenAPI input"))
@@ -388,11 +416,12 @@ let decodeDocument = (input: JSON.t): result<Ir.document> =>
       JsonDecode.stringField(~path=[], root, "openapi"),
       JsonDecode.objectField(~path=[], root, "info"),
       decodeTags(~path=[], root),
+      decodeTopLevelSecurity(~path=[], root),
       decodeOperations(~path=[], root),
       decodeSchemas(~path=[], root),
       decodeSecuritySchemes(~path=[], root),
     ) {
-    | (Ok(openapiVersion), Ok(info), Ok(tags), Ok(operations), Ok(schemas), Ok(securitySchemes)) =>
+    | (Ok(openapiVersion), Ok(info), Ok(tags), Ok(security), Ok(operations), Ok(schemas), Ok(securitySchemes)) =>
       if !String.startsWith(openapiVersion, "3.1.") {
         Error(Diagnostics.make(~path=["openapi"], ~message="Only OpenAPI 3.1 documents are supported"))
       } else {
@@ -406,6 +435,7 @@ let decodeDocument = (input: JSON.t): result<Ir.document> =>
             title,
             version,
             tags,
+            security,
             operations,
             schemas,
             securitySchemes,
@@ -415,11 +445,12 @@ let decodeDocument = (input: JSON.t): result<Ir.document> =>
         | (_, Error(problem)) => Error(problem)
         }
       }
-    | (Error(problem), _, _, _, _, _) => Error(problem)
-    | (_, Error(problem), _, _, _, _) => Error(problem)
-    | (_, _, Error(problem), _, _, _) => Error(problem)
-    | (_, _, _, Error(problem), _, _) => Error(problem)
-    | (_, _, _, _, Error(problem), _) => Error(problem)
-    | (_, _, _, _, _, Error(problem)) => Error(problem)
+    | (Error(problem), _, _, _, _, _, _) => Error(problem)
+    | (_, Error(problem), _, _, _, _, _) => Error(problem)
+    | (_, _, Error(problem), _, _, _, _) => Error(problem)
+    | (_, _, _, Error(problem), _, _, _) => Error(problem)
+    | (_, _, _, _, Error(problem), _, _) => Error(problem)
+    | (_, _, _, _, _, Error(problem), _) => Error(problem)
+    | (_, _, _, _, _, _, Error(problem)) => Error(problem)
     }
   }

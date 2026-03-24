@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "test": "pnpm run build && cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-core/test/*.test.mjs",
+    "test": "pnpm run build && cd ../.. && sh -c 'if [ -n \"$1\" ]; then vitest run --passWithNoTests packages/openapi-rescript-core/test/$1.test.mjs; else vitest run --passWithNoTests packages/openapi-rescript-core/test/*.test.mjs; fi' --",
     "build": "pnpm exec rescript build",
     "check": "node -e \"console.log('openapi-rescript-core check placeholder')\""
   },

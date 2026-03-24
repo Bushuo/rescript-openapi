@@ -53,6 +53,7 @@ type document = {
   title: string,
   version: string,
   tags: array<string>,
+  security: array<string>,
   operations: array<operation>,
   schemas: array<namedSchema>,
   securitySchemes: array<securityScheme>,
