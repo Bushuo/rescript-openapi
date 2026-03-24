@@ -1,5 +1,5 @@
 import {mkdir, readFile, rm, writeFile} from "node:fs/promises"
-import {dirname, join} from "node:path"
+import {dirname, isAbsolute, join, relative, resolve} from "node:path"
 import {parseInput} from "./parseInput.mjs"
 
 const manifestName = ".openapi-rescript-generated.json"
@@ -99,12 +99,27 @@ async function removeStaleFiles(targetDir, previousFiles, currentPaths) {
   const currentSet = new Set(currentPaths)
 
   for (const stalePath of previousFiles) {
-    if (!currentSet.has(stalePath)) {
-      await rm(join(targetDir, stalePath), {force: true, recursive: true})
+    if (!currentSet.has(stalePath) && isSafeGeneratedPath(targetDir, stalePath)) {
+      await rm(resolve(targetDir, stalePath), {force: true, recursive: true})
     }
   }
 }
 
 async function writeManifest(manifestPath, currentPaths) {
   await writeFile(manifestPath, `${JSON.stringify(currentPaths, null, 2)}\n`, "utf8")
+}
+
+function isSafeGeneratedPath(targetDir, generatedPath) {
+  if (typeof generatedPath !== "string" || generatedPath.length === 0) {
+    return false
+  }
+
+  const resolvedPath = resolve(targetDir, generatedPath)
+  const relativePath = relative(targetDir, resolvedPath)
+
+  if (relativePath === "") {
+    return false
+  }
+
+  return !relativePath.startsWith("..") && !isAbsolute(relativePath)
 }

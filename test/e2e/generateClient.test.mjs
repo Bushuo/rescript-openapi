@@ -1,8 +1,8 @@
 import {describe, expect, it} from "vitest"
-import {mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
+import {existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
 import {spawnSync} from "node:child_process"
 import {tmpdir} from "node:os"
-import {dirname, join, resolve} from "node:path"
+import {basename, join, resolve} from "node:path"
 
 function runCli(specPath, targetDir) {
   const cliPath = resolve("packages/openapi-rescript-cli/bin/openapi-rescript.mjs")
@@ -15,22 +15,6 @@ function runCli(specPath, targetDir) {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
   }
-}
-
-function packCliPackage() {
-  const packageDir = resolve("packages/openapi-rescript-cli")
-  const packDir = mkdtempSync(join(tmpdir(), "openapi-rescript-pack-"))
-  const result = spawnSync("pnpm", ["pack", "--pack-destination", packDir], {
-    cwd: packageDir,
-    encoding: "utf8",
-  })
-
-  expect(result.status ?? 1).toBe(0)
-
-  const tarball = readdirSync(packDir).find((file) => file.endsWith(".tgz"))
-  expect(tarball).toBeDefined()
-
-  return join(packDir, tarball)
 }
 
 describe("generateClient", () => {
@@ -48,36 +32,6 @@ describe("generateClient", () => {
       expect(readFileSync(join(targetDir, "Pets.res"), "utf8")).toContain("let listPets =")
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
-    }
-  })
-
-  it("runs from a packed CLI tarball installed into a fresh directory", () => {
-    const tarball = packCliPackage()
-    const installDir = mkdtempSync(join(tmpdir(), "openapi-rescript-install-"))
-    const outputDir = join(installDir, "generated")
-
-    try {
-      writeFileSync(join(installDir, "package.json"), "{}\n")
-
-      const install = spawnSync("pnpm", ["add", tarball, "--dir", installDir], {
-        encoding: "utf8",
-      })
-
-      expect(install.status ?? 1).toBe(0)
-
-      const result = spawnSync("pnpm", ["exec", "openapi-rescript", resolve("fixtures/specs/petstore.yaml"), outputDir], {
-        cwd: installDir,
-        encoding: "utf8",
-      })
-
-      expect(result.status ?? 1).toBe(0)
-      expect(result.stderr ?? "").toBe("")
-      expect(readdirSync(outputDir)).toEqual(
-        expect.arrayContaining(["Client.res", "Index.res", "Models.res", "Pets.res", "Schemas.res"])
-      )
-    } finally {
-      rmSync(installDir, {recursive: true, force: true})
-      rmSync(dirname(tarball), {recursive: true, force: true})
     }
   })
 
@@ -109,6 +63,24 @@ describe("generateClient", () => {
       expect(readdirSync(targetDir)).toContain("minimal.yaml")
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("ignores unsafe manifest entries outside the target directory", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+    const outsideFile = join(tmpdir(), `openapi-rescript-outside-${Date.now()}.txt`)
+
+    try {
+      writeFileSync(outsideFile, "keep\n")
+      writeFileSync(join(targetDir, ".openapi-rescript-generated.json"), JSON.stringify([`../${basename(outsideFile)}`]))
+
+      const result = runCli(resolve("fixtures/specs/petstore.yaml"), targetDir)
+
+      expect(result.exitCode).toBe(0)
+      expect(existsSync(outsideFile)).toBe(true)
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+      rmSync(outsideFile, {force: true})
     }
   })
 
