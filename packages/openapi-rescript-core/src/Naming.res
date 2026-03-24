@@ -64,6 +64,7 @@ let normalizeToken = (token: string): string =>
 
 let reservedIdentifiers = [
   "and",
+  "arguments",
   "as",
   "assert",
   "async",
@@ -81,6 +82,7 @@ let reservedIdentifiers = [
   "downto",
   "else",
   "enum",
+  "eval",
   "exception",
   "export",
   "extends",

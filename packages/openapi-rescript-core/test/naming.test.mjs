@@ -77,12 +77,37 @@ describe("naming and auth normalization", () => {
             },
           },
         },
+        "/eval": {
+          put: {
+            operationId: "eval",
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
+        "/arguments": {
+          delete: {
+            operationId: "arguments",
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
       },
     }
 
     let output = generate(reservedWordOperationId)
     expect(output.ok).toBe(true)
-    expect(output.value.operations.map(operation => operation.name)).toEqual(["type_", "await_"])
+    expect(output.value.operations.map(operation => operation.name)).toEqual([
+      "type_",
+      "await_",
+      "eval_",
+      "arguments_",
+    ])
   })
 
   it("derives stable operation names when operationId is missing or duplicated", () => {
