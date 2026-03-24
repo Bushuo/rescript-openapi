@@ -9,6 +9,12 @@ import {generate} from "../lib/js/src/OpenapiGenerator.bs.js"
 const minimalFixture = JSON.parse(
   readFileSync(new URL("./fixtures/minimal.json", import.meta.url), "utf8"),
 )
+const normalizedPetstore = JSON.parse(
+  readFileSync(new URL("./fixtures/petstore.normalized.json", import.meta.url), "utf8"),
+)
+const normalizedUnsupported = JSON.parse(
+  readFileSync(new URL("./fixtures/unsupported-schema.normalized.json", import.meta.url), "utf8"),
+)
 const packageDir = fileURLToPath(new URL("..", import.meta.url))
 const without = (object, key) => {
   let copy = {...object}
@@ -35,6 +41,28 @@ describe("generate", () => {
         version: "1.0.0",
         operations: [],
         schemas: [],
+      },
+    })
+  })
+
+  it("decodes a supported OpenAPI 3.1 document into IR", () => {
+    let output = generate(normalizedPetstore)
+
+    expect(output.ok).toBe(true)
+    expect(output.value.title).toBe("Petstore")
+    expect(output.value.version).toBe("1.0.0")
+    expect(output.value.operations.map(operation => operation.operationId)).toEqual([
+      "listPets",
+      "createPet",
+    ])
+    expect(output.value.schemas.map(schema => schema.name)).toEqual(["Pet", "NewPet"])
+  })
+
+  it("rejects unsupported schemas with a precise path", () => {
+    expect(generate(normalizedUnsupported)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "WeirdType"],
       },
     })
   })

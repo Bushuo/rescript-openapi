@@ -1,0 +1,22 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Unsupported Schema API",
+    "version": "1.0.0"
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "WeirdType": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    }
+  }
+}
