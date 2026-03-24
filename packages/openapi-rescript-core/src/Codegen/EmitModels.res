@@ -3,10 +3,10 @@ let header = [
   "",
 ]
 
-let renderField = (field: Ir.objectField): string =>
+let renderField = (~quoteLabels: bool, field: Ir.objectField): string =>
   Printer.indentLine(
     ~level=1,
-    field.name
+    Printer.recordLabel(~quoteAll=quoteLabels, field.name)
     ++ ": "
     ++ (
       if field.required {
@@ -21,9 +21,11 @@ let renderField = (field: Ir.objectField): string =>
 let renderSchema = (schema: Ir.namedSchema): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
+    let quoteLabels = Printer.shouldQuoteRecordLabels(Belt.Array.map(fields, field => field.name))
+
     Belt.Array.concatMany([
       ["type " ++ Printer.typeName(schema.name) ++ " = {"],
-      Belt.Array.map(fields, renderField),
+      Belt.Array.map(fields, field => renderField(~quoteLabels, field)),
       ["}"],
     ])
   | value => ["type " ++ Printer.typeName(schema.name) ++ " = " ++ Printer.modelType(value)]

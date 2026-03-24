@@ -43,7 +43,7 @@ type operation = {
   parameters: array<parameter>,
   requestBody: option<requestBody>,
   responses: array<response>,
-  security: array<securityRequirement>,
+  security: option<array<securityRequirement>>,
 }
 
 type securityScheme = {

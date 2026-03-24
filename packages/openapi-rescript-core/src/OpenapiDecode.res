@@ -232,21 +232,21 @@ let decodeSecurityRequirements = (
   ~path: array<string>,
   source: dict<JSON.t>,
   name: string,
-): result<array<Ir.securityRequirement>> =>
+): result<option<array<Ir.securityRequirement>>> =>
   switch Dict.get(source, name) {
-  | None => Ok([])
+  | None => Ok(None)
   | Some(securityJson) =>
     switch JSON.Decode.array(securityJson) {
     | None => Error(Diagnostics.make(~path=at(path, name), ~message="Expected array"))
     | Some(securityArray) =>
-      collectArray(securityArray, (entryJson, index) => {
+      switch collectArray(securityArray, (entryJson, index) => {
         let entryPath = at(at(path, name), Int.toString(index))
         switch JSON.Decode.object(entryJson) {
         | None => Error(Diagnostics.make(~path=entryPath, ~message="Expected object"))
         | Some(securityObject) =>
           let entries = Dict.toArray(securityObject)
           if Belt.Array.length(entries) == 0 {
-            Error(Diagnostics.make(~path=entryPath, ~message="Expected security requirement"))
+            Ok([])
           } else {
             collectArray(entries, ((securityName, requirementJson), _) =>
               switch decodeStringArray(~path=at(entryPath, securityName), requirementJson) {
@@ -266,7 +266,10 @@ let decodeSecurityRequirements = (
             )
           }
         }
-      })
+      }) {
+      | Ok(requirements) => Ok(Some(requirements))
+      | Error(problem) => Error(problem)
+      }
     }
   }
 
@@ -532,7 +535,11 @@ let decodeTags = (~path: array<string>, root: dict<JSON.t>): result<array<string
   }
 
 let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.securityRequirement>> =>
-  decodeSecurityRequirements(~path, root, "security")
+  switch decodeSecurityRequirements(~path, root, "security") {
+  | Ok(Some(security)) => Ok(security)
+  | Ok(None) => Ok([])
+  | Error(problem) => Error(problem)
+  }
 
 let decodeDocument = (input: JSON.t): result<Ir.document> =>
   switch JsonDecode.object(~path=[], input) {

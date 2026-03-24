@@ -18,10 +18,9 @@ let isSuccessStatus = (statusCode: string): bool =>
   String.startsWith(statusCode, "2")
 
 let effectiveSecurity = (~document: Ir.document, ~operation: Ir.operation): array<array<string>> =>
-  if Belt.Array.length(operation.security) > 0 {
-    operation.security
-  } else {
-    document.security
+  switch operation.security {
+  | Some(security) => security
+  | None => document.security
   }
 
 let operationResultType = (operation: Ir.operation): string =>
@@ -36,10 +35,10 @@ let operationResultType = (operation: Ir.operation): string =>
     }
   }
 
-let renderParameterField = (parameter: Ir.parameter): string =>
+let renderParameterField = (~quoteLabels: bool, parameter: Ir.parameter): string =>
   Printer.indentLine(
     ~level=1,
-    parameter.name
+    Printer.recordLabel(~quoteAll=quoteLabels, parameter.name)
     ++ ": "
     ++ (
       if parameter.required {
@@ -52,13 +51,24 @@ let renderParameterField = (parameter: Ir.parameter): string =>
   )
 
 let renderParamsType = (operation: Ir.operation): array<string> => {
+  let fieldNames =
+    Belt.Array.concat(
+      Belt.Array.map(operation.parameters, parameter => parameter.name),
+      switch operation.requestBody {
+      | Some(_) => ["body"]
+      | None => []
+      },
+    )
+  let quoteLabels = Printer.shouldQuoteRecordLabels(fieldNames)
+
   let bodyField =
     switch operation.requestBody {
     | None => []
     | Some(body) => [
         Printer.indentLine(
           ~level=1,
-          "body: "
+          Printer.recordLabel(~quoteAll=quoteLabels, "body")
+          ++ ": "
           ++ (
             if body.required {
               Printer.modelType(~qualifiedNamedRefs=true, body.schema)
@@ -71,7 +81,10 @@ let renderParamsType = (operation: Ir.operation): array<string> => {
       ]
     }
 
-  let fields = Belt.Array.concat(Belt.Array.map(operation.parameters, renderParameterField), bodyField)
+  let fields = Belt.Array.concat(
+    Belt.Array.map(operation.parameters, parameter => renderParameterField(~quoteLabels, parameter)),
+    bodyField,
+  )
 
   Belt.Array.concatMany([
     ["type " ++ paramsTypeName(operation) ++ " = {"],

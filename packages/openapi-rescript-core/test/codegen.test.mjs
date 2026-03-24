@@ -303,4 +303,93 @@ describe("codegen", () => {
     expect(defaultModule).toContain('name: "BasicAuth"')
     expect(defaultModule).toContain('authKind: "httpBasic"')
   })
+
+  it("keeps explicit operation-level security clears in emitted operations", () => {
+    let explicitSecurityClear = {
+      ...normalizedAuthenticatedApi,
+      paths: {
+        ...normalizedAuthenticatedApi.paths,
+        "/profile": {
+          ...normalizedAuthenticatedApi.paths["/profile"],
+          get: {
+            ...normalizedAuthenticatedApi.paths["/profile"].get,
+            security: [],
+          },
+        },
+      },
+    }
+
+    let output = generate(explicitSecurityClear)
+    let defaultModule = output.files.find(file => file.path === "Default_.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(defaultModule).toContain("security: [],")
+  })
+
+  it("emits compilable quoted record labels when parameter or schema field names are not plain identifiers", () => {
+    let quotedFieldFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Quoted Fields API",
+        version: "1.0.0",
+      },
+      tags: [{name: "unsafe"}],
+      components: {
+        schemas: {
+          UserProfile: {
+            type: "object",
+            required: ["user-id", "type", "active"],
+            properties: {
+              "user-id": {type: "string"},
+              type: {type: "string"},
+              active: {type: "boolean"},
+            },
+          },
+        },
+      },
+      paths: {
+        "/users/{user-id}": {
+          get: {
+            operationId: "getUser",
+            tags: ["unsafe"],
+            parameters: [
+              {
+                name: "user-id",
+                in: "path",
+                required: true,
+                schema: {type: "string"},
+              },
+              {
+                name: "verbose",
+                in: "query",
+                required: false,
+                schema: {type: "boolean"},
+              },
+            ],
+            responses: {
+              200: {
+                description: "ok",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/UserProfile"},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(quotedFieldFixture)
+    let unsafeModule = output.files.find(file => file.path === "Unsafe.res")?.contents
+    let modelsModule = output.files.find(file => file.path === "Models.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(unsafeModule).toContain('"user-id": string,')
+    expect(unsafeModule).toContain('"verbose": option<bool>,')
+    expect(modelsModule).toContain('"user-id": string,')
+    expect(modelsModule).toContain('"type": string,')
+    expect(modelsModule).toContain('"active": bool,')
+  })
 })

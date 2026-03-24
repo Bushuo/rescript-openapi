@@ -9,6 +9,15 @@ type file = {
 @send external toUpperCase: string => string = "toUpperCase"
 @val external jsonStringify: string => string = "JSON.stringify"
 
+let isLowercaseAscii = (char: string): bool => char >= "a" && char <= "z"
+
+let isUppercaseAscii = (char: string): bool => char >= "A" && char <= "Z"
+
+let isDigit = (char: string): bool => char >= "0" && char <= "9"
+
+let isRecordLabelChar = (char: string): bool =>
+  char == "_" || isLowercaseAscii(char) || isUppercaseAscii(char) || isDigit(char)
+
 let rec repeat = (count: int, value: string): string =>
   if count <= 0 {
     ""
@@ -42,6 +51,98 @@ let boolLiteral = (value: bool): string =>
 let quote = (value: string): string => jsonStringify(value)
 
 let typeName = (value: string): string => Naming.sanitizeOperationId(value)
+
+let reservedRecordLabels = [
+  "and",
+  "arguments",
+  "as",
+  "assert",
+  "async",
+  "await",
+  "break",
+  "case",
+  "catch",
+  "class",
+  "constraint",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "downto",
+  "else",
+  "enum",
+  "eval",
+  "exception",
+  "export",
+  "extends",
+  "external",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "implements",
+  "import",
+  "in",
+  "include",
+  "instanceof",
+  "interface",
+  "let",
+  "module",
+  "mutable",
+  "new",
+  "nonrec",
+  "null",
+  "of",
+  "open",
+  "or",
+  "package",
+  "private",
+  "protected",
+  "public",
+  "rec",
+  "return",
+  "static",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "to",
+  "true",
+  "try",
+  "type",
+  "typeof",
+  "var",
+  "void",
+  "when",
+  "while",
+  "with",
+  "yield",
+]
+
+let isReservedRecordLabel = (value: string): bool =>
+  Belt.Array.some(reservedRecordLabels, reserved => reserved == value)
+
+let isSafeRecordLabel = (value: string): bool =>
+  if value == "" {
+    false
+  } else {
+    let head = charAt(value, 0)
+    (isLowercaseAscii(head) || head == "_")
+    && !isReservedRecordLabel(value)
+    && Belt.Array.every(split(value, ""), isRecordLabelChar)
+  }
+
+let shouldQuoteRecordLabels = (labels: array<string>): bool =>
+  Belt.Array.some(labels, label => !isSafeRecordLabel(label))
+
+let recordLabel = (~quoteAll: bool, value: string): string =>
+  if quoteAll {
+    quote(value)
+  } else {
+    value
+  }
 
 let uppercaseHead = (token: string): string =>
   if token == "" {
@@ -78,8 +179,9 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.NamedRef(reference) =>
     (if qualifiedNamedRefs {"Models."} else {""}) ++ typeName(refName(reference))
   | Ir.Object(fields) =>
+    let quoteLabels = shouldQuoteRecordLabels(Belt.Array.map(fields, field => field.name))
     let renderedFields = Belt.Array.map(fields, field =>
-      field.name
+      recordLabel(~quoteAll=quoteLabels, field.name)
       ++ ": "
       ++ (
         if field.required {

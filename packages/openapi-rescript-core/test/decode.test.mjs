@@ -308,6 +308,40 @@ describe("decodeDocument", () => {
     })
   })
 
+  it("preserves explicit operation-level security clears instead of inheriting document auth", () => {
+    let explicitSecurityClear = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          get: {
+            ...normalizedPetstore.paths["/pets"].get,
+            security: [],
+          },
+        },
+      },
+    }
+
+    let output = generate(explicitSecurityClear)
+
+    expect(output.ok).toBe(true)
+    expect(output.value.security).toEqual([["ApiKeyAuth"]])
+    expect(output.value.operations.map(operation => operation.security)).toEqual([[], undefined])
+  })
+
+  it("accepts optional-auth security requirements expressed as empty objects", () => {
+    let optionalAuth = {
+      ...normalizedPetstore,
+      security: [{}, {ApiKeyAuth: []}],
+    }
+
+    let output = generate(optionalAuth)
+
+    expect(output.ok).toBe(true)
+    expect(output.value.security).toEqual([[], ["ApiKeyAuth"]])
+  })
+
   it("rejects unsupported HTTP auth schemes", () => {
     let unsupportedHttpScheme = {
       ...normalizedPetstore,
