@@ -118,6 +118,57 @@ describe("codegen", () => {
     )
   })
 
+  it("uses the default response schema as the generated result type when no explicit 2xx schema exists", () => {
+    let defaultResponseFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Default Success API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          FallbackPayload: {
+            type: "object",
+            required: ["ok"],
+            properties: {
+              ok: {type: "boolean"},
+            },
+          },
+        },
+      },
+      paths: {
+        "/fallback": {
+          get: {
+            operationId: "fallbackSuccess",
+            tags: ["default-success"],
+            responses: {
+              default: {
+                description: "fallback success payload",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/FallbackPayload"},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(defaultResponseFixture)
+    let defaultSuccessModule = output.files.find(file => file.path === "DefaultSuccess.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(defaultSuccessModule).toContain(
+      "): promise<result<Models.fallbackPayload, Client.operationError>> =>",
+    )
+    expect(defaultSuccessModule).toContain('statusCode: "default"')
+    expect(defaultSuccessModule).toContain(
+      "schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.fallbackPayload))",
+    )
+  })
+
   it("assigns unique module and file names when distinct tags sanitize to the same identifier", () => {
     let collidingTagsFixture = {
       openapi: "3.1.0",

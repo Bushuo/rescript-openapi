@@ -28,7 +28,12 @@ let operationResultType = (operation: Ir.operation): string =>
   switch Belt.Array.getBy(operation.responses, response => isSuccessStatus(response.statusCode)) {
   | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
   | Some({schema: None}) => "unit"
-  | None => "unit"
+  | None =>
+    switch Belt.Array.getBy(operation.responses, response => response.statusCode == "default") {
+    | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
+    | Some({schema: None}) => "unit"
+    | None => "unit"
+    }
   }
 
 let renderParameterField = (parameter: Ir.parameter): string =>

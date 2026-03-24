@@ -72,6 +72,8 @@ type jsonOperation = {
 
 let make = (config: t): t => config
 
+let isSuccessStatus = (status: int): bool => status >= 200 && status < 300
+
 let exnMessage = (error: exn): string =>
   switch JsExn.message(Obj.magic(error)) {
   | Some(message) => message
@@ -236,8 +238,17 @@ let encodeRequestBody = (
     }
   }
 
-let findResponse = (operation: jsonOperation, status: int): option<response> =>
+let findExactResponse = (operation: jsonOperation, status: int): option<response> =>
   Belt.Array.getBy(operation.responses, response => response.statusCode == Int.toString(status))
+
+let findDefaultResponse = (operation: jsonOperation): option<response> =>
+  Belt.Array.getBy(operation.responses, response => response.statusCode == "default")
+
+let findSuccessResponse = (operation: jsonOperation, status: int): option<response> =>
+  switch findExactResponse(operation, status) {
+  | Some(response) => Some(response)
+  | None => findDefaultResponse(operation)
+  }
 
 let makeRequestInit = (
   ~method_: Fetch.method,
@@ -280,13 +291,17 @@ let callJson = async (
         let status = response->Fetch.Response.status
         let responseText = await response->Fetch.Response.text
 
-        switch findResponse(operation, status) {
-        | None =>
+        switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
+        | (false, _) =>
           resolvePromise(
             Error(OperationError.unexpectedStatus(~operationName=operation.name, ~status, ~body=responseText)),
           )
-        | Some({schema: None}) => resolvePromise(Ok(Obj.magic(())))
-        | Some({schema: Some(schema)}) =>
+        | (true, None) =>
+          resolvePromise(
+            Error(OperationError.unexpectedStatus(~operationName=operation.name, ~status, ~body=responseText)),
+          )
+        | (true, Some({schema: None})) => resolvePromise(Ok(Obj.magic(())))
+        | (true, Some({schema: Some(schema)})) =>
           try {
             resolvePromise(Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, schema))))
           } catch {

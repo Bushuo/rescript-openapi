@@ -189,4 +189,80 @@ describe("openapi-rescript-runtime", () => {
       ),
     )
   })
+
+  it("does not treat declared non-2xx responses as successful results", async () => {
+    let {Client, Schema} = await loadRuntime()
+    let client = Client.make({
+      baseUrl: "https://example.test",
+      auth: [],
+      defaultHeaders: [],
+    })
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({message: "missing"}), {status: 404, headers: {"content-type": "application/json"}})),
+    )
+
+    let operation = {
+      name: "showUser",
+      method: "get",
+      path: "/users/1",
+      parameters: [],
+      requestBody: undefined,
+      responses: [
+        {
+          statusCode: "404",
+          schema: Schema.object_([Schema.field({name: "message", required: true}, Schema.string)]),
+        },
+      ],
+      security: [],
+      securitySchemes: [],
+    }
+
+    let result = await Client.callJson(client, operation, {})
+
+    expect(result).toEqual(
+      error(
+        expect.objectContaining({
+          kind: "unexpectedStatus",
+          operationName: "showUser",
+          status: 404,
+        }),
+      ),
+    )
+  })
+
+  it("uses default responses as the success decoder fallback for unmatched 2xx statuses", async () => {
+    let {Client, Schema} = await loadRuntime()
+    let client = Client.make({
+      baseUrl: "https://example.test",
+      auth: [],
+      defaultHeaders: [],
+    })
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ok: true}), {status: 250, headers: {"content-type": "application/json"}})),
+    )
+
+    let operation = {
+      name: "fallbackSuccess",
+      method: "get",
+      path: "/fallback",
+      parameters: [],
+      requestBody: undefined,
+      responses: [
+        {
+          statusCode: "default",
+          schema: Schema.object_([Schema.field({name: "ok", required: true}, Schema.bool)]),
+        },
+      ],
+      security: [],
+      securitySchemes: [],
+    }
+
+    let result = await Client.callJson(client, operation, {})
+
+    expect(result).toEqual(ok({ok: true}))
+  })
 })
