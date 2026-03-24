@@ -114,4 +114,61 @@ describe("codegen", () => {
       'schema: Some("unit")',
     )
   })
+
+  it("assigns unique module and file names when distinct tags sanitize to the same identifier", () => {
+    let collidingTagsFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Colliding Tags API",
+        version: "1.0.0",
+      },
+      tags: [{name: "pet-store"}, {name: "pet store"}],
+      paths: {
+        "/pets": {
+          get: {
+            operationId: "listPets",
+            tags: ["pet-store"],
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+          post: {
+            operationId: "createPet",
+            tags: ["pet store"],
+            responses: {
+              201: {
+                description: "created",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(collidingTagsFixture)
+
+    expect(output.ok).toBe(true)
+    expect(output.files.map(file => file.path)).toEqual([
+      "Client.res",
+      "Index.res",
+      "Models.res",
+      "PetStore.res",
+      "PetStore2.res",
+      "Schemas.res",
+    ])
+    expect(output.files.find(file => file.path === "PetStore.res")?.contents).toContain(
+      'name: "listPets"',
+    )
+    expect(output.files.find(file => file.path === "PetStore2.res")?.contents).toContain(
+      'name: "createPet"',
+    )
+    expect(output.files.find(file => file.path === "Index.res")?.contents).toContain(
+      "module PetStore = PetStore",
+    )
+    expect(output.files.find(file => file.path === "Index.res")?.contents).toContain(
+      "module PetStore2 = PetStore2",
+    )
+  })
 })
