@@ -264,8 +264,19 @@ let matchesStatusCode = (statusCode: string, status: int): bool => {
   }
 }
 
+let findExactResponse = (operation: jsonOperation, status: int): option<response> =>
+  Belt.Array.getBy(operation.responses, response => response.statusCode == Int.toString(status))
+
+let findWildcardResponse = (operation: jsonOperation, status: int): option<response> =>
+  Belt.Array.getBy(operation.responses, response =>
+    response.statusCode != Int.toString(status) && matchesStatusCode(response.statusCode, status)
+  )
+
 let findExplicitResponse = (operation: jsonOperation, status: int): option<response> =>
-  Belt.Array.getBy(operation.responses, response => matchesStatusCode(response.statusCode, status))
+  switch findExactResponse(operation, status) {
+  | Some(response) => Some(response)
+  | None => findWildcardResponse(operation, status)
+  }
 
 let findDefaultResponse = (operation: jsonOperation): option<response> =>
   Belt.Array.getBy(operation.responses, response => response.statusCode == "default")

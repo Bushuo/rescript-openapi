@@ -345,4 +345,42 @@ describe("openapi-rescript-runtime", () => {
 
     expect(result).toEqual(ok({ok: true}))
   })
+
+  it("prefers exact success responses over wildcard matches regardless of response order", async () => {
+    let {Client, Schema} = await loadRuntime()
+    let client = Client.make({
+      baseUrl: "https://example.test",
+      auth: [],
+      defaultHeaders: [],
+    })
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({exact: true}), {status: 200, headers: {"content-type": "application/json"}})),
+    )
+
+    let operation = {
+      name: "exactBeforeWildcard",
+      method: "get",
+      path: "/precedence",
+      parameters: [],
+      requestBody: undefined,
+      responses: [
+        {
+          statusCode: "2XX",
+          schema: Schema.object_([Schema.field({name: "wildcard", required: true}, Schema.bool)]),
+        },
+        {
+          statusCode: "200",
+          schema: Schema.object_([Schema.field({name: "exact", required: true}, Schema.bool)]),
+        },
+      ],
+      security: [],
+      securitySchemes: [],
+    }
+
+    let result = await Client.callJson(client, operation, {})
+
+    expect(result).toEqual(ok({exact: true}))
+  })
 })
