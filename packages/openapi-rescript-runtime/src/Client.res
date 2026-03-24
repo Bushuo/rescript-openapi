@@ -238,22 +238,45 @@ let encodeRequestBody = (
     }
   }
 
-let findExactResponse = (operation: jsonOperation, status: int): option<response> =>
-  Belt.Array.getBy(operation.responses, response => response.statusCode == Int.toString(status))
+let matchesStatusCode = (statusCode: string, status: int): bool => {
+  let statusText = Int.toString(status)
+  let patternLength = String.length(statusCode)
+
+  if patternLength != String.length(statusText) {
+    false
+  } else {
+    let rec loop = index =>
+      if index >= patternLength {
+        true
+      } else {
+        switch (String.get(statusCode, index), String.get(statusText, index)) {
+        | (Some(expected), Some(actual)) =>
+          if expected == actual || expected == "X" {
+            loop(index + 1)
+          } else {
+            false
+          }
+        | _ => false
+        }
+      }
+
+    loop(0)
+  }
+}
+
+let findExplicitResponse = (operation: jsonOperation, status: int): option<response> =>
+  Belt.Array.getBy(operation.responses, response => matchesStatusCode(response.statusCode, status))
 
 let findDefaultResponse = (operation: jsonOperation): option<response> =>
   Belt.Array.getBy(operation.responses, response => response.statusCode == "default")
 
 let hasExplicitSuccessResponse = (operation: jsonOperation): bool =>
   Belt.Array.some(operation.responses, response =>
-    switch Int.fromString(response.statusCode) {
-    | Some(status) => isSuccessStatus(status)
-    | None => false
-    }
+    String.startsWith(response.statusCode, "2")
   )
 
 let findSuccessResponse = (operation: jsonOperation, status: int): option<response> =>
-  switch findExactResponse(operation, status) {
+  switch findExplicitResponse(operation, status) {
   | Some(response) => Some(response)
   | None =>
     if hasExplicitSuccessResponse(operation) {
