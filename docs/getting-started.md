@@ -1,0 +1,90 @@
+# Getting Started
+
+## Workspace Layout
+
+This repository is a `pnpm` workspace with three packages:
+
+- `packages/openapi-rescript-cli` loads OpenAPI documents, parses YAML or JSON, resolves local file `$ref`s, and hands a normalized document to the generator
+- `packages/openapi-rescript-core` contains the ReScript generator logic
+- `packages/openapi-rescript-runtime` contains the runtime that generated clients import
+
+The generator CLI is not exposed through a root `pnpm exec` command in this repository. Use the repository-local entrypoint directly:
+
+```bash
+node packages/openapi-rescript-cli/bin/openapi-rescript.mjs <spec-file> [output-dir]
+```
+
+## Install
+
+```bash
+pnpm install
+```
+
+## Build
+
+Build the workspace from the repository root:
+
+```bash
+pnpm build
+```
+
+This compiles the workspace packages and is the command the docs and tests are aligned to.
+
+## Happy Path
+
+Generate the sample Petstore client into a temporary directory:
+
+```bash
+mkdir -p ./tmp/petstore-client
+node packages/openapi-rescript-cli/bin/openapi-rescript.mjs fixtures/specs/petstore.yaml ./tmp/petstore-client
+ls ./tmp/petstore-client
+```
+
+Expected output files:
+
+- `Client.res`
+- `Index.res`
+- `Models.res`
+- `Pets.res`
+- `Schemas.res`
+
+## Test
+
+Run the workspace test suite with the same arguments used by the repo CI flow:
+
+```bash
+pnpm test -- --runInBand
+```
+
+## Generated Client Dependencies
+
+Generated clients import the shared runtime package and its schema/HTTP dependencies:
+
+- `openapi-rescript-runtime`
+- `rescript-fetch`
+- `sury@11.0.0-alpha.4`
+
+## Supported Subset
+
+V1 supports a strict subset of OpenAPI 3.1:
+
+- OpenAPI `3.1.x`
+- YAML or JSON input
+- local file `$ref`s only
+- tags, operations, parameters, request bodies, JSON responses, status codes, and security declarations
+- JSON media types only, including `application/json` and `application/*+json`
+
+Unsupported constructs are rejected instead of being approximated.
+
+## Strict Failure Behavior
+
+The generator fails fast when it cannot represent a schema safely.
+
+On failure it:
+
+- exits non-zero
+- writes a structured JSON diagnostic to stderr
+- does not emit partial generated output
+
+For example, `fixtures/specs/unsupported-schema.yaml` intentionally fails because the schema uses `oneOf`, which is currently unsupported in this generator subset.
+
