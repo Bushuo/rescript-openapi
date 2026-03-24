@@ -212,6 +212,22 @@ let decodeParameters = (~path: array<string>, operationObject: dict<JSON.t>): re
     }
   }
 
+let sameParameter = (left: Ir.parameter, right: Ir.parameter): bool =>
+  left.name == right.name && left.location == right.location
+
+let mergeParameters = (
+  inheritedParameters: array<Ir.parameter>,
+  operationParameters: array<Ir.parameter>,
+): array<Ir.parameter> => {
+  let remainingInherited = Belt.Array.keep(
+    inheritedParameters,
+    inherited =>
+      !Belt.Array.some(operationParameters, operation => sameParameter(inherited, operation)),
+  )
+
+  Belt.Array.concat(remainingInherited, operationParameters)
+}
+
 let decodeSecurityRequirements = (
   ~path: array<string>,
   source: dict<JSON.t>,
@@ -278,7 +294,7 @@ let decodeOperation = (
         method: method_,
         path: routePath,
         tags,
-        parameters: Belt.Array.concat(inheritedParameters, parameters),
+        parameters: mergeParameters(inheritedParameters, parameters),
         requestBody,
         responses,
         security,

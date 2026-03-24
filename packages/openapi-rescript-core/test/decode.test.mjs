@@ -95,6 +95,37 @@ describe("decodeDocument", () => {
     ])
   })
 
+  it("lets operation parameters override matching path-item parameters", () => {
+    let withOverriddenPathParameter = {
+      ...normalizedPetstore,
+      paths: {
+        ...normalizedPetstore.paths,
+        "/pets": {
+          ...normalizedPetstore.paths["/pets"],
+          parameters: [
+            {
+              name: "limit",
+              in: "query",
+              required: true,
+              schema: {type: "string"},
+            },
+          ],
+        },
+      },
+    }
+
+    let output = generate(withOverriddenPathParameter)
+    expect(output.ok).toBe(true)
+    expect(output.value.operations[0].parameters).toEqual([
+      {
+        name: "limit",
+        location: "query",
+        required: false,
+        schema: {TAG: "Scalar", _0: "integer"},
+      },
+    ])
+  })
+
   it("rejects unsupported schemas with a precise path", () => {
     expect(generate(normalizedUnsupported)).toMatchObject({
       ok: false,
