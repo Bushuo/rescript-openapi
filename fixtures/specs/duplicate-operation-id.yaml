@@ -1,0 +1,26 @@
+openapi: 3.1.0
+info:
+  title: Duplicate Operation IDs API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      responses:
+        "200":
+          description: List pets
+    post:
+      operationId: listPets
+      responses:
+        "201":
+          description: Create pet
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: Get pet
+    delete:
+      operationId: deletePet
+      responses:
+        "204":
+          description: Delete pet

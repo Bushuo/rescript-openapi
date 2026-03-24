@@ -6,6 +6,7 @@
     "openapi-rescript": "./bin/openapi-rescript.mjs"
   },
   "dependencies": {
+    "openapi-rescript-core": "file:../openapi-rescript-core",
     "yaml": "^2.8.3"
   },
   "scripts": {

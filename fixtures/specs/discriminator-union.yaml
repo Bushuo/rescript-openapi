@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: Discriminator Union API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Pet:
+      oneOf:
+        - $ref: "#/components/schemas/Cat"
+        - $ref: "#/components/schemas/Dog"
+      discriminator:
+        propertyName: kind
+    Cat:
+      type: object
+      required: [kind, meows]
+      properties:
+        kind:
+          type: string
+        meows:
+          type: boolean
+      additionalProperties: false
+    Dog:
+      type: object
+      required: [kind, barks]
+      properties:
+        kind:
+          type: string
+        barks:
+          type: boolean
+      additionalProperties: false

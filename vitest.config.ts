@@ -5,7 +5,10 @@ export default defineConfig({
     projects: [
       {
         test: {
-          include: ["packages/**/*.{test,spec}.{js,mjs,cjs,ts,tsx}"],
+          include: [
+            "packages/**/*.{test,spec}.{js,mjs,cjs,ts,tsx}",
+            "test/e2e/**/*.{test,spec}.{js,mjs,cjs,ts,tsx}",
+          ],
           passWithNoTests: true,
         },
       },
