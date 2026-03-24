@@ -244,10 +244,23 @@ let findExactResponse = (operation: jsonOperation, status: int): option<response
 let findDefaultResponse = (operation: jsonOperation): option<response> =>
   Belt.Array.getBy(operation.responses, response => response.statusCode == "default")
 
+let hasExplicitSuccessResponse = (operation: jsonOperation): bool =>
+  Belt.Array.some(operation.responses, response =>
+    switch Int.fromString(response.statusCode) {
+    | Some(status) => isSuccessStatus(status)
+    | None => false
+    }
+  )
+
 let findSuccessResponse = (operation: jsonOperation, status: int): option<response> =>
   switch findExactResponse(operation, status) {
   | Some(response) => Some(response)
-  | None => findDefaultResponse(operation)
+  | None =>
+    if hasExplicitSuccessResponse(operation) {
+      None
+    } else {
+      findDefaultResponse(operation)
+    }
   }
 
 let makeRequestInit = (

@@ -169,6 +169,70 @@ describe("codegen", () => {
     )
   })
 
+  it("keeps the explicit 2xx response schema as the generated result type when default is also present", () => {
+    let mixedSuccessFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Mixed Success API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          ExplicitPayload: {
+            type: "object",
+            required: ["ok"],
+            properties: {
+              ok: {type: "boolean"},
+            },
+          },
+          DefaultPayload: {
+            type: "object",
+            required: ["fallback"],
+            properties: {
+              fallback: {type: "boolean"},
+            },
+          },
+        },
+      },
+      paths: {
+        "/mixed": {
+          get: {
+            operationId: "mixedSuccesses",
+            tags: ["mixed-success"],
+            responses: {
+              200: {
+                description: "explicit success payload",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/ExplicitPayload"},
+                  },
+                },
+              },
+              default: {
+                description: "default payload",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/DefaultPayload"},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(mixedSuccessFixture)
+    let mixedSuccessModule = output.files.find(file => file.path === "MixedSuccess.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(mixedSuccessModule).toContain(
+      "): promise<result<Models.explicitPayload, Client.operationError>> =>",
+    )
+    expect(mixedSuccessModule).toContain('statusCode: "200"')
+    expect(mixedSuccessModule).toContain('statusCode: "default"')
+  })
+
   it("assigns unique module and file names when distinct tags sanitize to the same identifier", () => {
     let collidingTagsFixture = {
       openapi: "3.1.0",

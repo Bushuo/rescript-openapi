@@ -265,4 +265,50 @@ describe("openapi-rescript-runtime", () => {
 
     expect(result).toEqual(ok({ok: true}))
   })
+
+  it("does not use default success decoding when explicit 2xx responses are declared", async () => {
+    let {Client, Schema} = await loadRuntime()
+    let client = Client.make({
+      baseUrl: "https://example.test",
+      auth: [],
+      defaultHeaders: [],
+    })
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({fallback: true}), {status: 250, headers: {"content-type": "application/json"}})),
+    )
+
+    let operation = {
+      name: "mixedSuccesses",
+      method: "get",
+      path: "/mixed",
+      parameters: [],
+      requestBody: undefined,
+      responses: [
+        {
+          statusCode: "200",
+          schema: Schema.object_([Schema.field({name: "ok", required: true}, Schema.bool)]),
+        },
+        {
+          statusCode: "default",
+          schema: Schema.object_([Schema.field({name: "fallback", required: true}, Schema.bool)]),
+        },
+      ],
+      security: [],
+      securitySchemes: [],
+    }
+
+    let result = await Client.callJson(client, operation, {})
+
+    expect(result).toEqual(
+      error(
+        expect.objectContaining({
+          kind: "unexpectedStatus",
+          operationName: "mixedSuccesses",
+          status: 250,
+        }),
+      ),
+    )
+  })
 })
