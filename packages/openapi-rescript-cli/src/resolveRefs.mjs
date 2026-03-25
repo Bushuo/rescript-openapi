@@ -75,6 +75,7 @@ async function readDocument(filePath) {
 }
 
 function parseDocument(contents, filePath) {
+  // Replace the UTF-8 BOM before parsing
   const text = contents.replace(/^\uFEFF/, "")
   if (filePath.endsWith(".json") || /^[\s\r\n]*[{[]/.test(text)) {
     return JSON.parse(text)
@@ -84,6 +85,7 @@ function parseDocument(contents, filePath) {
 }
 
 function resolvePointer(document, fragment) {
+  // Return the whole document for empty or root fragments
   if (!fragment || fragment === "/") {
     return document
   }
@@ -94,6 +96,7 @@ function resolvePointer(document, fragment) {
     .slice(1)
     .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"))
 
+  // Traverse the tokens of the fragment
   let current = document
   for (const token of tokens) {
     if (current == null || !(token in current)) {
