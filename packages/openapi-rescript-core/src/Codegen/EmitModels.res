@@ -12,7 +12,23 @@ let renderField = (~quoteLabels: bool, field: Ir.objectField): string =>
     } ++ ",",
   )
 
-let renderSchema = (schema: Ir.namedSchema): array<string> =>
+let renderEnum = (~name: string, ~enumMode: Ir.enumMode, values: array<string>): array<string> => {
+  let constructorLines = Array.map(values, value =>
+    Printer.indentLine(~level=1, "| " ++ Printer.enumConstructor(value))
+  )
+  let unknownLine = switch enumMode {
+  | Ir.Open => [Printer.enumUnknownVariantLine(~level=1)]
+  | Ir.Closed => []
+  }
+
+  Belt.Array.concatMany([
+    ["type " ++ Printer.enumTypeRef(name) ++ " ="],
+    constructorLines,
+    unknownLine,
+  ])
+}
+
+let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
     let quoteLabels = Printer.shouldQuoteRecordLabels(Array.map(fields, field => field.name))
@@ -22,11 +38,11 @@ let renderSchema = (schema: Ir.namedSchema): array<string> =>
       Array.map(fields, field => renderField(~quoteLabels, field)),
       ["}"],
     ])
-  | Ir.StringEnum(_) => ["type " ++ Printer.typeName(schema.name) ++ " = string"]
+  | Ir.StringEnum({values, _}) => renderEnum(~name=schema.name, ~enumMode, values)
   | value => ["type " ++ Printer.typeName(schema.name) ++ " = " ++ Printer.modelType(value)]
   }
 
-let emit = (document: Ir.document): Printer.file => {
+let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {
   let definitions = ref([])
 
   Array.forEachWithIndex(document.schemas, (schema, index) => {
@@ -34,7 +50,10 @@ let emit = (document: Ir.document): Printer.file => {
       definitions.contents = Belt.Array.concat(definitions.contents, [""])
     }
 
-    definitions.contents = Belt.Array.concat(definitions.contents, renderSchema(schema))
+    definitions.contents = Belt.Array.concat(
+      definitions.contents,
+      renderSchema(schema, ~enumMode),
+    )
   })
 
   Printer.makeFile(~path="Models.res", ~lines=Belt.Array.concat(header, definitions.contents))

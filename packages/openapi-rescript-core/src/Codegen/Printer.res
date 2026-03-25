@@ -52,6 +52,29 @@ let quote = (value: string): string => jsonStringify(value)
 
 let typeName = (value: string): string => Naming.emittedTypeName(value)
 
+let enumTypeRef = (~qualifiedModels: bool=false, name: string): string =>
+  (if qualifiedModels { "Models." } else { "" }) ++ typeName(name)
+
+let enumConstructor = (~qualifiedModels: bool=false, wireValue: string): string =>
+  (if qualifiedModels { "Models." } else { "" }) ++ Naming.enumConstructorName(wireValue)
+
+let enumUnknown = (~qualifiedModels: bool=false, valueExpr: string): string =>
+  (if qualifiedModels { "Models.Unknown" } else { "Unknown" }) ++ "(" ++ valueExpr ++ ")"
+
+let enumUnknownVariantLine = (~level: int=0): string => indentLine(~level, "| Unknown(string)")
+
+let enumSchemaExpr = (~qualifiedSchemas: bool=false, name: string): string =>
+  (if qualifiedSchemas { "Schemas." } else { "" }) ++ typeName(name)
+
+let enumDecodeErrorExpr = (valueExpr: string, values: array<string>): string =>
+  "Error(" ++
+  quote("Unexpected enum value: ") ++
+  " ++ " ++
+  valueExpr ++
+  " ++ " ++
+  quote(". Expected one of: " ++ Belt.Array.joinWith(values, ", ", value => value)) ++
+  ")"
+
 let reservedRecordLabels = [
   "and",
   "arguments",
@@ -178,12 +201,7 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.StringEnum(_) => "string"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
   | Ir.NamedRef(reference) =>
-    if qualifiedNamedRefs {
-      "Models."
-    } else {
-      ""
-    } ++
-    typeName(refName(reference))
+    enumTypeRef(~qualifiedModels=qualifiedNamedRefs, refName(reference))
   | Ir.Object(fields) =>
     let quoteLabels = shouldQuoteRecordLabels(Array.map(fields, field => field.name))
     let renderedFields = Array.map(fields, field =>
@@ -245,12 +263,7 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     "(" ++
     schemaExpr(~qualified, item) ++ ")"
   | Ir.NamedRef(reference) =>
-    if qualified {
-      "Schemas."
-    } else {
-      ""
-    } ++
-    typeName(refName(reference))
+    enumSchemaExpr(~qualifiedSchemas=qualified, refName(reference))
   | Ir.Object(fields) =>
     let renderedFields = Array.map(fields, field =>
       if qualified {

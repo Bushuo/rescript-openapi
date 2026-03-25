@@ -12,6 +12,9 @@ const normalizedEnums = JSON.parse(
   readFileSync(new URL("./fixtures/enums.normalized.json", import.meta.url), "utf8"),
 )
 
+const generateWithOptions = (input, options) => generate(input, options)
+const sortFiles = files => [...files].sort((left, right) => left.path.localeCompare(right.path))
+
 const readGoldenFiles = fixtureName => {
   let fixtureDir = new URL(`./golden/${fixtureName}/`, import.meta.url)
 
@@ -22,6 +25,8 @@ const readGoldenFiles = fixtureName => {
       contents: readFileSync(new URL(`./golden/${fixtureName}/${fileName}`, import.meta.url), "utf8"),
     }))
 }
+
+const generatedFile = (output, path) => output.files.find(file => file.path === path)?.contents
 
 describe("codegen", () => {
   it("emits the expected ReScript modules for the petstore fixture", () => {
@@ -80,18 +85,35 @@ describe("codegen", () => {
     )
   })
 
-  it("emits lifted enum aliases before parent schemas that reference them", () => {
-    let output = generate(normalizedEnums)
-    let generatedModels = output.files.find(file => file.path === "Models.res")?.contents
-    let generatedSchemas = output.files.find(file => file.path === "Schemas.res")?.contents
+  it("emits the expected ReScript modules for open and closed enum modes", () => {
+    let openOutput = generateWithOptions(normalizedEnums, {enumMode: "open"})
+    let closedOutput = generateWithOptions(normalizedEnums, {enumMode: "closed"})
+    let openModels = generatedFile(openOutput, "Models.res")
+    let closedModels = generatedFile(closedOutput, "Models.res")
+    let openSchemas = generatedFile(openOutput, "Schemas.res")
+    let closedSchemas = generatedFile(closedOutput, "Schemas.res")
 
-    expect(output.ok).toBe(true)
-    expect(generatedModels.indexOf("type sessionVisibility = string")).toBeLessThan(
-      generatedModels.indexOf("type session = {"),
+    expect(openOutput.ok).toBe(true)
+    expect(closedOutput.ok).toBe(true)
+    expect(sortFiles(openOutput.files)).toEqual(readGoldenFiles("enums-open"))
+    expect(sortFiles(closedOutput.files)).toEqual(readGoldenFiles("enums-closed"))
+    expect(openModels).toContain("| Unknown(string)")
+    expect(closedModels).not.toContain("| Unknown(string)")
+    expect(openModels.indexOf("type sessionVisibility =")).toBeLessThan(
+      openModels.indexOf("type session = {"),
     )
-    expect(
-      generatedSchemas.indexOf("let sessionVisibility: t<Models.sessionVisibility> = string"),
-    ).toBeLessThan(generatedSchemas.indexOf("let session: t<Models.session> = object_(["))
+    expect(openModels).toContain("state: sessionState,")
+    expect(openModels).toContain("visibility: sessionVisibility,")
+    expect(closedModels).toContain("state: sessionState,")
+    expect(closedModels).toContain("visibility: sessionVisibility,")
+    expect(openSchemas.indexOf("let sessionVisibility: t<Models.sessionVisibility> = stringMapped(")).toBeLessThan(
+      openSchemas.indexOf("let session: t<Models.session> = object_(["),
+    )
+    expect(closedSchemas.indexOf("let sessionVisibility: t<Models.sessionVisibility> = stringMapped(")).toBeLessThan(
+      closedSchemas.indexOf("let session: t<Models.session> = object_(["),
+    )
+    expect(openSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
+    expect(closedSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
   })
 
   it("preserves schema-less responses as None in emitted metadata", () => {

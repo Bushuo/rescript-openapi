@@ -1,6 +1,6 @@
 type enumMode =
-  | Open
-  | Closed
+  | @as("open") Open
+  | @as("closed") Closed
 
 type rec schema =
   | Scalar(string)
