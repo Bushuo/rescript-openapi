@@ -76,7 +76,16 @@ let decodeStringArray = (~path: array<string>, json: JSON.t): result<array<strin
 let decodeEnumValues = (~path: array<string>, schemaObject: dict<JSON.t>): result<array<string>> =>
   switch JsonDecode.requiredField(~path, schemaObject, "enum") {
   | Error(problem) => Error(problem)
-  | Ok(enumJson) => decodeStringArray(~path=at(path, "enum"), enumJson)
+  | Ok(enumJson) =>
+    switch decodeStringArray(~path=at(path, "enum"), enumJson) {
+    | Ok(values) =>
+      if Array.length(values) == 0 {
+        Error(Diagnostics.make(~path=at(path, "enum"), ~message="Enum arrays must not be empty"))
+      } else {
+        Ok(values)
+      }
+    | Error(problem) => Error(problem)
+    }
   }
 
 let decodeRequiredNames = (~path: array<string>, schemaObject: dict<JSON.t>): result<

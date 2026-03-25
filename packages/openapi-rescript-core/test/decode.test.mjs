@@ -312,6 +312,30 @@ describe("decodeDocument", () => {
     })
   })
 
+  it("rejects empty enum arrays with a precise path", () => {
+    let emptyEnum = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        schemas: {
+          ...normalizedPetstore.components.schemas,
+          PetState: {
+            type: "string",
+            enum: [],
+          },
+        },
+      },
+    }
+
+    expect(generate(emptyEnum)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "PetState", "enum"],
+        message: "Enum arrays must not be empty",
+      },
+    })
+  })
+
   it("derives fallback names for operations without operationId", () => {
     let withoutOperationId = {
       ...normalizedPetstore,
