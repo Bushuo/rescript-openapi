@@ -8,6 +8,9 @@ const normalizedPetstore = JSON.parse(
 const normalizedAuthenticatedApi = JSON.parse(
   readFileSync(new URL("./fixtures/authenticated-api.normalized.json", import.meta.url), "utf8"),
 )
+const normalizedEnums = JSON.parse(
+  readFileSync(new URL("./fixtures/enums.normalized.json", import.meta.url), "utf8"),
+)
 
 const readGoldenFiles = fixtureName => {
   let fixtureDir = new URL(`./golden/${fixtureName}/`, import.meta.url)
@@ -75,6 +78,20 @@ describe("codegen", () => {
     expect(output.files.find(file => file.path === "Index.res")?.contents).toContain(
       "module Admin = Admin",
     )
+  })
+
+  it("emits lifted enum aliases before parent schemas that reference them", () => {
+    let output = generate(normalizedEnums)
+    let generatedModels = output.files.find(file => file.path === "Models.res")?.contents
+    let generatedSchemas = output.files.find(file => file.path === "Schemas.res")?.contents
+
+    expect(output.ok).toBe(true)
+    expect(generatedModels.indexOf("type sessionVisibility = string")).toBeLessThan(
+      generatedModels.indexOf("type session = {"),
+    )
+    expect(
+      generatedSchemas.indexOf("let sessionVisibility: t<Models.sessionVisibility> = string"),
+    ).toBeLessThan(generatedSchemas.indexOf("let session: t<Models.session> = object_(["))
   })
 
   it("preserves schema-less responses as None in emitted metadata", () => {

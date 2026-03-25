@@ -138,7 +138,10 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
   ) {
   | Some(problem) => problem
   | None =>
-    switch Dict.get(schemaObject, "$ref") {
+    if hasField(schemaObject, "$ref") && hasField(schemaObject, "enum") {
+      unsupported(~path=at(path, "enum"), ~feature="enum with $ref")
+    } else {
+      switch Dict.get(schemaObject, "$ref") {
     | Some(_) => decodeRef(~path, schemaObject)
     | None =>
       if hasField(schemaObject, "enum") {
@@ -160,6 +163,7 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
           }
         }
       }
+    }
     }
   }
 

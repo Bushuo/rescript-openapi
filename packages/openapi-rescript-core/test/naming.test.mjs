@@ -267,7 +267,7 @@ describe("naming and auth normalization", () => {
     expect(output.ok).toBe(true)
     expect(generatedModels).toContain("type listUsersParamSort =")
     expect(generatedModels).toContain("type createSessionRequestState =")
-    expect(generatedModels).toContain("type getSessionResponseState =")
+    expect(generatedModels).toContain("type getSessionResponse200State =")
   })
 
   it("rejects lifted enum type name collisions after normalization", () => {
@@ -363,6 +363,66 @@ describe("naming and auth normalization", () => {
         message: "Enum type name collision after normalization: listUsersParamSort",
       },
     })
+  })
+
+  it("uses response status codes to keep lifted response enum names distinct", () => {
+    let distinctResponseEnums = {
+      openapi: "3.1.0",
+      info: {
+        title: "Distinct Response Enum API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/sessions/{sessionId}": {
+          get: {
+            operationId: "getSession",
+            responses: {
+              200: {
+                description: "ok",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["state"],
+                      properties: {
+                        state: {
+                          type: "string",
+                          enum: ["active", "archived"],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              400: {
+                description: "bad request",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      required: ["state"],
+                      properties: {
+                        state: {
+                          type: "string",
+                          enum: ["invalid", "missing"],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(distinctResponseEnums)
+    let generatedModels = generatedFile(output, "Models.res")
+
+    expect(output.ok).toBe(true)
+    expect(generatedModels).toContain("type getSessionResponse200State =")
+    expect(generatedModels).toContain("type getSessionResponse400State =")
   })
 
   it("rejects enum constructor collisions after normalization", () => {

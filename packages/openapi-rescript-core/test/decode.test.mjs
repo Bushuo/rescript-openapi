@@ -148,7 +148,7 @@ describe("decodeDocument", () => {
         "sessionVisibility",
         "listUsersParamSort",
         "createSessionRequestState",
-        "getSessionResponseState",
+        "getSessionResponse200State",
       ]),
     )
     expect(findSchema(output.value.schemas, "SessionState")).toEqual({
@@ -203,12 +203,36 @@ describe("decodeDocument", () => {
             {
               name: "state",
               required: true,
-              schema: {TAG: "NamedRef", _0: "#/components/schemas/getSessionResponseState"},
+              schema: {TAG: "NamedRef", _0: "#/components/schemas/getSessionResponse200State"},
             },
           ]),
         },
       },
     ])
+  })
+
+  it("rejects enum siblings on $ref schemas with a precise path", () => {
+    let refWithEnumSibling = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        schemas: {
+          ...normalizedPetstore.components.schemas,
+          PetAlias: {
+            $ref: "#/components/schemas/Pet",
+            enum: ["cat"],
+          },
+        },
+      },
+    }
+
+    expect(generate(refWithEnumSibling)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "PetAlias", "enum"],
+        message: "Unsupported schema construct: enum with $ref",
+      },
+    })
   })
 
   it("rejects non-string enum base types with a precise path", () => {

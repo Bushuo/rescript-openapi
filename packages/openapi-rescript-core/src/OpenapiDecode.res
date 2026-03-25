@@ -570,7 +570,7 @@ let liftResponseEnums = (
           "schema",
         ],
         ~scope=Naming.Response(operation.name),
-        ~segments=[],
+        ~segments=[response.statusCode],
         ~reservedNames,
         ~liftedSchemas,
         schema,
@@ -640,7 +640,7 @@ let liftReachableEnums = (
       liftOperationEnums(operation, ~reservedNames, ~liftedSchemas)
     ) {
     | Error(problem) => Error(problem)
-    | Ok(operations) => Ok((operations, Belt.Array.concat(namedSchemas, liftedSchemas.contents)))
+    | Ok(operations) => Ok((operations, Belt.Array.concat(liftedSchemas.contents, namedSchemas)))
     }
   }
 }
