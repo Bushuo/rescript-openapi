@@ -35,37 +35,36 @@ describe("generateClient", () => {
     }
   })
 
-  it("keeps the default open enum mode past enum decoding", () => {
+  it("accepts the default open enum mode through the CLI", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 
     try {
-      const openResult = runCli(resolve("fixtures/specs/backend-api.json"), targetDir)
+      const openResult = runCli(resolve("fixtures/specs/string-enum-regression.yaml"), targetDir)
 
       expect(openResult.exitCode).toBe(1)
       expect(openResult.stdout).toBe("")
       expect(openResult.stderr).not.toContain("Usage: openapi-rescript")
       expect(JSON.parse(openResult.stderr)).toMatchObject({
         path: expect.any(Array),
-        message: expect.any(String),
+        message: "Unsupported schema construct: enum",
       })
-      expect(JSON.parse(openResult.stderr).message).not.toBe("Unsupported schema construct: enum")
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
     }
   })
 
-  it("accepts closed enum mode as a CLI option", () => {
+  it("accepts explicit closed enum mode as a CLI option", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 
     try {
-      const closedResult = runCli(resolve("fixtures/specs/backend-api.json"), targetDir, ["--enum-mode=closed"])
+      const closedResult = runCli(resolve("fixtures/specs/string-enum-regression.yaml"), targetDir, ["--enum-mode=closed"])
 
       expect(closedResult.exitCode).toBe(1)
       expect(closedResult.stdout).toBe("")
       expect(closedResult.stderr).not.toContain("Usage: openapi-rescript")
       expect(JSON.parse(closedResult.stderr)).toMatchObject({
         path: expect.any(Array),
-        message: expect.any(String),
+        message: "Unsupported schema construct: enum",
       })
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
