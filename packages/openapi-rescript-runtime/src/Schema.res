@@ -33,6 +33,16 @@ let number = float
 let bool: t<bool> = S.bool
 let boolean = bool
 
+let stringMapped = (~decode: string => result<'value, string>, ~encode: 'value => string): t<'value> =>
+  string->S.transform(s => {
+    parser: value =>
+      switch decode(value) {
+      | Ok(decoded) => decoded
+      | Error(message) => s.fail(message)
+      },
+    serializer: encode,
+  })
+
 let array = (item: t<'value>): t<array<'value>> => S.array(item)
 
 let object_ = (fields: array<field>): t<'value> =>

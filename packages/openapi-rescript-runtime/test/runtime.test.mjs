@@ -1,12 +1,13 @@
 import {beforeEach, describe, expect, it, vi} from "vitest"
 
 const loadRuntime = async () => {
-  let [Client, Schema] = await Promise.all([
+  let [Client, Schema, S] = await Promise.all([
     import("../lib/bs/src/Client.bs.js"),
     import("../lib/bs/src/Schema.bs.js"),
+    import("../node_modules/sury/src/S.bs.js"),
   ])
 
-  return {Client, Schema}
+  return {Client, Schema, S}
 }
 
 const ok = value => ({TAG: "Ok", _0: value})
@@ -15,6 +16,29 @@ const error = value => ({TAG: "Error", _0: value})
 describe("openapi-rescript-runtime", () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it("maps string schemas through custom enum codecs", async () => {
+    let {Schema, S} = await loadRuntime()
+
+    let active = {TAG: "Active"}
+    let unknown = value => ({TAG: "Unknown", _0: value})
+    let openStatusSchema = Schema.stringMapped(
+      value => (value === "Active" ? ok(active) : ok(unknown(value))),
+      value => (value.TAG === "Unknown" ? value._0 : "Active"),
+    )
+    let closedStatusSchema = Schema.stringMapped(
+      value => (value === "Active" ? ok(active) : error(`Unexpected enum value: ${value}`)),
+      _value => "Active",
+    )
+
+    expect(S.parseJsonStringOrThrow(JSON.stringify("Active"), openStatusSchema)).toEqual(active)
+    expect(S.parseJsonStringOrThrow(JSON.stringify("Paused"), openStatusSchema)).toEqual(unknown("Paused"))
+    expect(() => S.parseJsonStringOrThrow(JSON.stringify("Paused"), closedStatusSchema)).toThrow(
+      /Unexpected enum value: Paused/,
+    )
+    expect(S.reverseConvertToJsonStringOrThrow(active, openStatusSchema)).toBe(JSON.stringify("Active"))
+    expect(S.reverseConvertToJsonStringOrThrow(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
   })
 
   it("encodes a JSON request body and decodes the typed JSON response", async () => {
