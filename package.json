@@ -3,7 +3,7 @@
   "packageManager": "pnpm",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "vitest run --passWithNoTests",
+    "test": "pnpm build && vitest run --passWithNoTests",
     "check": "pnpm -r check"
   },
   "devDependencies": {
