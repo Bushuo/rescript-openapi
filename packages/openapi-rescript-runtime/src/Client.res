@@ -89,17 +89,17 @@ let hasValue = (params: 'params, key: string): bool =>
   }
 
 let findCredential = (client: t, schemeName: string): option<authCredential> =>
-  Belt.Array.getBy(client.auth, credential => credential.schemeName == schemeName)
+  Array.find(client.auth, credential => credential.schemeName == schemeName)
 
 let findSecurityScheme = (operation: jsonOperation, schemeName: string): option<securityScheme> =>
-  Belt.Array.getBy(operation.securitySchemes, scheme => scheme.name == schemeName)
+  Array.find(operation.securitySchemes, scheme => scheme.name == schemeName)
 
 let isRequirementSatisfied = (
   client: t,
   operation: jsonOperation,
   requirement: array<string>,
 ): bool =>
-  Belt.Array.every(requirement, schemeName =>
+  Array.every(requirement, schemeName =>
     switch (findCredential(client, schemeName), findSecurityScheme(operation, schemeName)) {
     | (Some(_), Some(_)) => true
     | _ => false
@@ -107,7 +107,7 @@ let isRequirementSatisfied = (
   )
 
 let resolveSecurityRequirement = (client: t, operation: jsonOperation): option<array<string>> =>
-  Belt.Array.getBy(operation.security, requirement =>
+  Array.find(operation.security, requirement =>
     isRequirementSatisfied(client, operation, requirement)
   )
 
@@ -131,7 +131,7 @@ let scalarToString = (json: JSON.t): string =>
       | None =>
         switch JSON.Decode.null(json) {
         | Some(_) => "null"
-        | None => JSON.stringifyAny(json)->Belt.Option.getWithDefault("")
+        | None => JSON.stringifyAny(json)->Option.getOr("")
         }
       }
     }
@@ -166,7 +166,7 @@ let applySecurity = (
   switch resolveSecurityRequirement(client, operation) {
   | None => ()
   | Some(requirement) =>
-    Belt.Array.forEach(requirement, schemeName =>
+    Array.forEach(requirement, schemeName =>
       switch (findCredential(client, schemeName), findSecurityScheme(operation, schemeName)) {
       | (Some(credential), Some(scheme)) =>
         switch scheme.authKind {
@@ -196,7 +196,7 @@ let applyParameters = (operation: jsonOperation, params: 'params, headers: Fetch
   let queryParams = ref([])
 
   try {
-    Belt.Array.forEach(operation.parameters, parameter =>
+    Array.forEach(operation.parameters, parameter =>
       switch getValue(params, parameter.name) {
       | None =>
         if parameter.required {
@@ -288,10 +288,10 @@ let matchesStatusCode = (statusCode: string, status: int): bool => {
 }
 
 let findExactResponse = (operation: jsonOperation, status: int): option<response> =>
-  Belt.Array.getBy(operation.responses, response => response.statusCode == Int.toString(status))
+  Array.find(operation.responses, response => response.statusCode == Int.toString(status))
 
 let findWildcardResponse = (operation: jsonOperation, status: int): option<response> =>
-  Belt.Array.getBy(operation.responses, response =>
+  Array.find(operation.responses, response =>
     response.statusCode != Int.toString(status) && matchesStatusCode(response.statusCode, status)
   )
 
@@ -302,10 +302,10 @@ let findExplicitResponse = (operation: jsonOperation, status: int): option<respo
   }
 
 let findDefaultResponse = (operation: jsonOperation): option<response> =>
-  Belt.Array.getBy(operation.responses, response => response.statusCode == "default")
+  Array.find(operation.responses, response => response.statusCode == "default")
 
 let hasExplicitSuccessResponse = (operation: jsonOperation): bool =>
-  Belt.Array.some(operation.responses, response => String.startsWith(response.statusCode, "2"))
+  Array.some(operation.responses, response => String.startsWith(response.statusCode, "2"))
 
 let findSuccessResponse = (operation: jsonOperation, status: int): option<response> =>
   switch findExplicitResponse(operation, status) {
@@ -338,7 +338,7 @@ let callJson = async (client: t, operation: jsonOperation, params: 'params): pro
   | Error(error) => resolvePromise(Error(error))
   | Ok((path, queryParams)) =>
     let requestUrl = makeUrl(path, client.baseUrl)
-    Belt.Array.forEach(queryParams, ((name, value)) =>
+    Array.forEach(queryParams, ((name, value)) =>
       requestUrl->searchParams->appendSearchParam(name, value)
     )
     let requestHeaders = Fetch.Headers.clone(headers)

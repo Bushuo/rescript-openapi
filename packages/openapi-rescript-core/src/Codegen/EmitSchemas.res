@@ -16,41 +16,39 @@ let header = [
 let emitSchema = (schema: Ir.namedSchema): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
-    let fieldLines = Belt.Array.map(fields, field =>
-      "  field(~name="
-      ++ Printer.quote(field.name)
-      ++ ", ~required="
-      ++ Printer.boolLiteral(field.required)
-      ++ ", "
-      ++ Printer.schemaExpr(field.schema)
-      ++ "),"
+    let fieldLines = Array.map(fields, field =>
+      "  field(~name=" ++
+      Printer.quote(field.name) ++
+      ", ~required=" ++
+      Printer.boolLiteral(field.required) ++
+      ", " ++
+      Printer.schemaExpr(field.schema) ++ "),"
     )
 
     Belt.Array.concatMany([
       [
-        "let "
-        ++ Printer.typeName(schema.name)
-        ++ ": t<Models."
-        ++ Printer.typeName(schema.name)
-        ++ "> = object_([",
+        "let " ++
+        Printer.typeName(schema.name) ++
+        ": t<Models." ++
+        Printer.typeName(schema.name) ++ "> = object_([",
       ],
       fieldLines,
-      ["])",],
+      ["])"],
     ])
   | value => [
-      "let "
-      ++ Printer.typeName(schema.name)
-      ++ ": t<Models."
-      ++ Printer.typeName(schema.name)
-      ++ "> = "
-      ++ Printer.schemaExpr(value),
+      "let " ++
+      Printer.typeName(schema.name) ++
+      ": t<Models." ++
+      Printer.typeName(schema.name) ++
+      "> = " ++
+      Printer.schemaExpr(value),
     ]
   }
 
 let emit = (document: Ir.document): Printer.file => {
   let definitions = ref([])
 
-  Belt.Array.forEachWithIndex(document.schemas, (index, schema) => {
+  Array.forEachWithIndex(document.schemas, (schema, index) => {
     if index > 0 {
       definitions.contents = Belt.Array.concat(definitions.contents, [""])
     }
@@ -58,12 +56,11 @@ let emit = (document: Ir.document): Printer.file => {
     definitions.contents = Belt.Array.concat(definitions.contents, emitSchema(schema))
   })
 
-  let lines =
-    if Belt.Array.length(definitions.contents) == 0 {
-      header
-    } else {
-      Belt.Array.concatMany([header, [""], definitions.contents])
-    }
+  let lines = if Array.length(definitions.contents) == 0 {
+    header
+  } else {
+    Belt.Array.concatMany([header, [""], definitions.contents])
+  }
 
   Printer.makeFile(~path="Schemas.res", ~lines)
 }

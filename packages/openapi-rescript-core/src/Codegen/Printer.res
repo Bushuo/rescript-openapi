@@ -122,20 +122,20 @@ let reservedRecordLabels = [
 ]
 
 let isReservedRecordLabel = (value: string): bool =>
-  Belt.Array.some(reservedRecordLabels, reserved => reserved == value)
+  Array.some(reservedRecordLabels, reserved => reserved == value)
 
 let isSafeRecordLabel = (value: string): bool =>
   if value == "" {
     false
   } else {
     let head = charAt(value, 0)
-    (isLowercaseAscii(head) || head == "_")
-    && !isReservedRecordLabel(value)
-    && Belt.Array.every(split(value, ""), isRecordLabelChar)
+    (isLowercaseAscii(head) || head == "_") &&
+    !isReservedRecordLabel(value) &&
+    Array.every(split(value, ""), isRecordLabelChar)
   }
 
 let shouldQuoteRecordLabels = (labels: array<string>): bool =>
-  Belt.Array.some(labels, label => !isSafeRecordLabel(label))
+  Array.some(labels, label => !isSafeRecordLabel(label))
 
 let recordLabel = (~quoteAll: bool, value: string): string =>
   if quoteAll {
@@ -159,12 +159,12 @@ let moduleName = (value: string): string =>
 
 let refName = (reference: string): string => {
   let segments = split(reference, "/")
-  let length = Belt.Array.length(segments)
+  let length = Array.length(segments)
 
   if length == 0 {
     reference
   } else {
-    Belt.Array.getExn(segments, length - 1)
+    Belt.Array.getOrThrow(segments, length - 1)
   }
 }
 
@@ -177,19 +177,21 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.Scalar(_) => "Js.Json.t"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
   | Ir.NamedRef(reference) =>
-    (if qualifiedNamedRefs {"Models."} else {""}) ++ typeName(refName(reference))
+    if qualifiedNamedRefs {
+      "Models."
+    } else {
+      ""
+    } ++
+    typeName(refName(reference))
   | Ir.Object(fields) =>
-    let quoteLabels = shouldQuoteRecordLabels(Belt.Array.map(fields, field => field.name))
-    let renderedFields = Belt.Array.map(fields, field =>
-      recordLabel(~quoteAll=quoteLabels, field.name)
-      ++ ": "
-      ++ (
-        if field.required {
-          modelType(~qualifiedNamedRefs, field.schema)
-        } else {
-          "option<" ++ modelType(~qualifiedNamedRefs, field.schema) ++ ">"
-        }
-      )
+    let quoteLabels = shouldQuoteRecordLabels(Array.map(fields, field => field.name))
+    let renderedFields = Array.map(fields, field =>
+      recordLabel(~quoteAll=quoteLabels, field.name) ++
+      ": " ++ if field.required {
+        modelType(~qualifiedNamedRefs, field.schema)
+      } else {
+        "option<" ++ modelType(~qualifiedNamedRefs, field.schema) ++ ">"
+      }
     )
 
     "{ " ++ Belt.Array.joinWith(renderedFields, ", ", field => field) ++ " }"
@@ -197,35 +199,77 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
 
 let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
   switch schema {
-  | Ir.Scalar("string") => (if qualified {"Schemas.string"} else {"string"})
-  | Ir.Scalar("integer") => (if qualified {"Schemas.integer"} else {"integer"})
-  | Ir.Scalar("number") => (if qualified {"Schemas.number"} else {"number"})
-  | Ir.Scalar("boolean") => (if qualified {"Schemas.boolean"} else {"boolean"})
-  | Ir.Scalar(_) => (if qualified {"Schemas.string"} else {"string"})
+  | Ir.Scalar("string") =>
+    if qualified {
+      "Schemas.string"
+    } else {
+      "string"
+    }
+  | Ir.Scalar("integer") =>
+    if qualified {
+      "Schemas.integer"
+    } else {
+      "integer"
+    }
+  | Ir.Scalar("number") =>
+    if qualified {
+      "Schemas.number"
+    } else {
+      "number"
+    }
+  | Ir.Scalar("boolean") =>
+    if qualified {
+      "Schemas.boolean"
+    } else {
+      "boolean"
+    }
+  | Ir.Scalar(_) =>
+    if qualified {
+      "Schemas.string"
+    } else {
+      "string"
+    }
   | Ir.Array(item) =>
-    (if qualified {"Schemas.array"} else {"array"}) ++ "(" ++ schemaExpr(~qualified, item) ++ ")"
+    if qualified {
+      "Schemas.array"
+    } else {
+      "array"
+    } ++
+    "(" ++
+    schemaExpr(~qualified, item) ++ ")"
   | Ir.NamedRef(reference) =>
-    (if qualified {"Schemas."} else {""}) ++ typeName(refName(reference))
+    if qualified {
+      "Schemas."
+    } else {
+      ""
+    } ++
+    typeName(refName(reference))
   | Ir.Object(fields) =>
-    let renderedFields = Belt.Array.map(fields, field =>
-      (if qualified {"Schemas.field"} else {"field"})
-      ++ "(~name="
-      ++ quote(field.name)
-      ++ ", ~required="
-      ++ boolLiteral(field.required)
-      ++ ", "
-      ++ schemaExpr(~qualified, field.schema)
-      ++ ")"
+    let renderedFields = Array.map(fields, field =>
+      if qualified {
+        "Schemas.field"
+      } else {
+        "field"
+      } ++
+      "(~name=" ++
+      quote(field.name) ++
+      ", ~required=" ++
+      boolLiteral(field.required) ++
+      ", " ++
+      schemaExpr(~qualified, field.schema) ++ ")"
     )
 
-    (if qualified {"Schemas.object_("} else {"object_("})
-    ++ "["
-    ++ Belt.Array.joinWith(renderedFields, ", ", field => field)
-    ++ "])"
+    if qualified {
+      "Schemas.object_("
+    } else {
+      "object_("
+    } ++
+    "[" ++
+    Belt.Array.joinWith(renderedFields, ", ", field => field) ++ "])"
   }
 
 let stringArray = (values: array<string>): string =>
-  "[" ++ Belt.Array.joinWith(Belt.Array.map(values, quote), ", ", value => value) ++ "]"
+  "[" ++ Belt.Array.joinWith(Array.map(values, quote), ", ", value => value) ++ "]"
 
 let stringMatrix = (values: array<array<string>>): string =>
-  "[" ++ Belt.Array.joinWith(Belt.Array.map(values, stringArray), ", ", value => value) ++ "]"
+  "[" ++ Belt.Array.joinWith(Array.map(values, stringArray), ", ", value => value) ++ "]"

@@ -6,7 +6,7 @@ let collectArray = (items: array<'a>, fn: ('a, int) => result<'b>): result<array
   let values = ref([])
   let error = ref(None)
 
-  Belt.Array.forEachWithIndex(items, (index, item) =>
+  Array.forEachWithIndex(items, (item, index) =>
     switch error.contents {
     | Some(_) => ()
     | None =>
@@ -23,8 +23,9 @@ let collectArray = (items: array<'a>, fn: ('a, int) => result<'b>): result<array
   }
 }
 
-let unsupported = (~path: array<string>, ~feature: string): result<'a> =>
-  Error(Diagnostics.make(~path, ~message="Unsupported schema construct: " ++ feature))
+let unsupported = (~path: array<string>, ~feature: string): result<'a> => Error(
+  Diagnostics.make(~path, ~message="Unsupported schema construct: " ++ feature),
+)
 
 let hasField = (schemaObject: dict<JSON.t>, name: string): bool =>
   switch Dict.get(schemaObject, name) {
@@ -33,13 +34,11 @@ let hasField = (schemaObject: dict<JSON.t>, name: string): bool =>
   }
 
 let contains = (values: array<string>, target: string): bool =>
-  Belt.Array.some(values, value => value == target)
+  Array.some(values, value => value == target)
 
-let unsupportedField = (
-  ~path: array<string>,
-  schemaObject: dict<JSON.t>,
-  name: string,
-): option<result<Ir.schema>> =>
+let unsupportedField = (~path: array<string>, schemaObject: dict<JSON.t>, name: string): option<
+  result<Ir.schema>,
+> =>
   if hasField(schemaObject, name) {
     Some(unsupported(~path=at(path, name), ~feature=name))
   } else {
@@ -52,10 +51,10 @@ let rec firstUnsupportedField = (
   fields: array<string>,
   ~index: int=0,
 ): option<result<Ir.schema>> =>
-  if index >= Belt.Array.length(fields) {
+  if index >= Array.length(fields) {
     None
   } else {
-    switch unsupportedField(~path, schemaObject, Belt.Array.getExn(fields, index)) {
+    switch unsupportedField(~path, schemaObject, Belt.Array.getOrThrow(fields, index)) {
     | Some(problem) => Some(problem)
     | None => firstUnsupportedField(~path, schemaObject, fields, ~index=index + 1)
     }
@@ -68,15 +67,15 @@ let decodeStringArray = (~path: array<string>, json: JSON.t): result<array<strin
     collectArray(items, (item, index) =>
       switch JSON.Decode.string(item) {
       | Some(value) => Ok(value)
-      | None => Error(Diagnostics.make(~path=at(path, Int.toString(index)), ~message="Expected string"))
+      | None =>
+        Error(Diagnostics.make(~path=at(path, Int.toString(index)), ~message="Expected string"))
       }
     )
   }
 
-let decodeRequiredNames = (
-  ~path: array<string>,
-  schemaObject: dict<JSON.t>,
-): result<array<string>> =>
+let decodeRequiredNames = (~path: array<string>, schemaObject: dict<JSON.t>): result<
+  array<string>,
+> =>
   switch Dict.get(schemaObject, "required") {
   | None => Ok([])
   | Some(value) => decodeStringArray(~path=at(path, "required"), value)
@@ -84,10 +83,10 @@ let decodeRequiredNames = (
 
 let ensureClosedObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<unit> =>
   switch Dict.get(schemaObject, "additionalProperties") {
-  | None => Ok(())
+  | None => Ok()
   | Some(value) =>
     switch JSON.Decode.bool(value) {
-    | Some(false) => Ok(())
+    | Some(false) => Ok()
     | Some(true) => unsupported(~path, ~feature="additionalProperties")
     | None => unsupported(~path, ~feature="additionalProperties")
     }
@@ -168,7 +167,7 @@ and decodeArraySchema = (~path: array<string>, schemaObject: dict<JSON.t>): resu
 and decodeObjectSchema = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir.schema> =>
   switch ensureClosedObject(~path, schemaObject) {
   | Error(problem) => Error(problem)
-  | Ok(()) =>
+  | Ok() =>
     switch decodeRequiredNames(~path, schemaObject) {
     | Error(problem) => Error(problem)
     | Ok(requiredNames) =>

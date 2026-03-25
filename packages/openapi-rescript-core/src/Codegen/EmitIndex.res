@@ -1,5 +1,5 @@
 let emit = (~tagModules: array<string>): Printer.file => {
-  let tagLines = Belt.Array.map(tagModules, tagModule => "module " ++ tagModule ++ " = " ++ tagModule)
+  let tagLines = Array.map(tagModules, tagModule => "module " ++ tagModule ++ " = " ++ tagModule)
 
   Printer.makeFile(
     ~path="Index.res",

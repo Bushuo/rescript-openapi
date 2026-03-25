@@ -26,7 +26,7 @@ let tokenize = (input: string): array<string> => {
   let tokens = ref([])
   let current = ref("")
 
-  Belt.Array.forEach(split(input, ""), char =>
+  Array.forEach(split(input, ""), char =>
     if isIdentifierChar(char) {
       current.contents = current.contents ++ char
     } else {
@@ -52,8 +52,7 @@ let uppercaseHead = (token: string): string =>
     toUpperCase(charAt(token, 0)) ++ sliceFrom(token, 1)
   }
 
-let hasLowercaseLetter = (token: string): bool =>
-  Belt.Array.some(split(token, ""), isLowercaseLetter)
+let hasLowercaseLetter = (token: string): bool => Array.some(split(token, ""), isLowercaseLetter)
 
 let normalizeToken = (token: string): string =>
   if hasLowercaseLetter(token) {
@@ -132,7 +131,7 @@ let reservedIdentifiers = [
 ]
 
 let makeCodegenSafeIdentifier = (identifier: string): string =>
-  if Belt.Array.some(reservedIdentifiers, reserved => reserved == identifier) {
+  if Array.some(reservedIdentifiers, reserved => reserved == identifier) {
     identifier ++ "_"
   } else {
     identifier
@@ -140,22 +139,21 @@ let makeCodegenSafeIdentifier = (identifier: string): string =>
 
 let makeIdentifier = (tokens: array<string>): string => {
   let filtered = Belt.Array.keep(tokens, token => token != "")
-  let normalizedTokens = Belt.Array.map(filtered, normalizeToken)
+  let normalizedTokens = Array.map(filtered, normalizeToken)
 
-  let identifier =
-    switch Belt.Array.get(normalizedTokens, 0) {
-    | None => "operation"
-    | Some(first) =>
-      let value = ref(lowercaseHead(first))
+  let identifier = switch normalizedTokens[0] {
+  | None => "operation"
+  | Some(first) =>
+    let value = ref(lowercaseHead(first))
 
-      Belt.Array.forEachWithIndex(normalizedTokens, (index, token) => {
-        if index > 0 {
-          value.contents = value.contents ++ uppercaseHead(token)
-        }
-      })
+    Array.forEachWithIndex(normalizedTokens, (token, index) => {
+      if index > 0 {
+        value.contents = value.contents ++ uppercaseHead(token)
+      }
+    })
 
-      value.contents
-    }
+    value.contents
+  }
 
   if identifier == "" {
     "operation"
@@ -171,10 +169,12 @@ let sanitizeOperationId = (operationId: string): string => makeIdentifier(tokeni
 let derivePathTokens = (path: string): array<string> => {
   let tokens = ref([])
 
-  Belt.Array.forEach(split(path, "/"), segment =>
+  Array.forEach(split(path, "/"), segment =>
     if segment == "" {
       ()
-    } else if String.startsWith(segment, "{") && String.endsWith(segment, "}") && String.length(segment) > 2 {
+    } else if (
+      String.startsWith(segment, "{") && String.endsWith(segment, "}") && String.length(segment) > 2
+    ) {
       let parameterName = sliceRange(segment, 1, String.length(segment) - 1)
       tokens.contents = Belt.Array.concat(tokens.contents, ["by"])
       tokens.contents = Belt.Array.concat(tokens.contents, tokenize(parameterName))
@@ -188,18 +188,25 @@ let derivePathTokens = (path: string): array<string> => {
 
 let deriveOperationName = (~method_: string, ~path: string): string => {
   let pathTokens = derivePathTokens(path)
-  let suffix = if Belt.Array.length(pathTokens) == 0 {["root"]} else {pathTokens}
+  let suffix = if Array.length(pathTokens) == 0 {
+    ["root"]
+  } else {
+    pathTokens
+  }
   makeIdentifier(Belt.Array.concat([toLowerCase(method_)], suffix))
 }
 
-let countNormalizedOperationIdUsages = (operations: array<Ir.operation>, operationId: string): int => {
+let countNormalizedOperationIdUsages = (
+  operations: array<Ir.operation>,
+  operationId: string,
+): int => {
   let normalizedOperationId = sanitizeOperationId(operationId)
 
   Belt.Array.reduce(operations, 0, (count, operation) =>
     switch operation.operationId {
     | Some(value) if sanitizeOperationId(value) == normalizedOperationId => count + 1
     | _ => count
-    },
+    }
   )
 }
 
@@ -214,13 +221,13 @@ let normalizeOperations = (operations: array<Ir.operation>): result<array<Ir.ope
   let normalized = ref([])
   let error = ref(None)
 
-  Belt.Array.forEach(operations, operation =>
+  Array.forEach(operations, operation =>
     switch error.contents {
     | Some(_) => ()
     | None =>
       let name = preferredOperationName(operations, operation)
 
-      switch Belt.Array.getBy(normalized.contents, (existing: Ir.operation) => existing.name == name) {
+      switch Array.find(normalized.contents, (existing: Ir.operation) => existing.name == name) {
       | Some(_) =>
         error.contents = Some(
           Diagnostics.make(
@@ -228,8 +235,7 @@ let normalizeOperations = (operations: array<Ir.operation>): result<array<Ir.ope
             ~message="Operation name collision after normalization: " ++ name,
           ),
         )
-      | None =>
-        normalized.contents = Belt.Array.concat(normalized.contents, [{...operation, name}])
+      | None => normalized.contents = Belt.Array.concat(normalized.contents, [{...operation, name}])
       }
     }
   )

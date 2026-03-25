@@ -1,12 +1,7 @@
 type t
 
 @obj
-external makeTransport: (
-  ~kind: string=?,
-  ~operationName: string,
-  ~message: string,
-  unit,
-) => t = ""
+external makeTransport: (~kind: string=?, ~operationName: string, ~message: string, unit) => t = ""
 
 @obj
 external makeRequestEncoding: (

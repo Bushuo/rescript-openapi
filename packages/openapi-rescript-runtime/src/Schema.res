@@ -39,13 +39,12 @@ let object_ = (fields: array<field>): t<'value> =>
   S.object(s => {
     let output = Dict.make()
 
-    Belt.Array.forEach(fields, field => {
-      let value: unknown =
-        if field.required {
-          Obj.magic(s.field(field.name, field.schema))
-        } else {
-          Obj.magic(s.fieldOr(field.name, S.option(field.schema), None))
-        }
+    Array.forEach(fields, field => {
+      let value: unknown = if field.required {
+        Obj.magic(s.field(field.name, field.schema))
+      } else {
+        Obj.magic(s.fieldOr(field.name, S.option(field.schema), None))
+      }
 
       Dict.set(output, field.name, Obj.magic(value))
     })

@@ -8,14 +8,13 @@ type tagModule = {
 }
 
 let operationTags = (operation: Ir.operation): array<string> =>
-  if Belt.Array.length(operation.tags) > 0 {
+  if Array.length(operation.tags) > 0 {
     operation.tags
   } else {
     [defaultTag]
   }
 
-let isSuccessStatus = (statusCode: string): bool =>
-  String.startsWith(statusCode, "2")
+let isSuccessStatus = (statusCode: string): bool => String.startsWith(statusCode, "2")
 
 let effectiveSecurity = (~document: Ir.document, ~operation: Ir.operation): array<array<string>> =>
   switch operation.security {
@@ -24,11 +23,11 @@ let effectiveSecurity = (~document: Ir.document, ~operation: Ir.operation): arra
   }
 
 let operationResultType = (operation: Ir.operation): string =>
-  switch Belt.Array.getBy(operation.responses, response => isSuccessStatus(response.statusCode)) {
+  switch Array.find(operation.responses, response => isSuccessStatus(response.statusCode)) {
   | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
   | Some({schema: None}) => "unit"
   | None =>
-    switch Belt.Array.getBy(operation.responses, response => response.statusCode == "default") {
+    switch Array.find(operation.responses, response => response.statusCode == "default") {
     | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
     | Some({schema: None}) => "unit"
     | None => "unit"
@@ -38,59 +37,47 @@ let operationResultType = (operation: Ir.operation): string =>
 let renderParameterField = (~quoteLabels: bool, parameter: Ir.parameter): string =>
   Printer.indentLine(
     ~level=1,
-    Printer.recordLabel(~quoteAll=quoteLabels, parameter.name)
-    ++ ": "
-    ++ (
-      if parameter.required {
-        Printer.modelType(~qualifiedNamedRefs=true, parameter.schema)
-      } else {
-        "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, parameter.schema) ++ ">"
-      }
-    )
-    ++ ",",
+    Printer.recordLabel(~quoteAll=quoteLabels, parameter.name) ++
+    ": " ++
+    if parameter.required {
+      Printer.modelType(~qualifiedNamedRefs=true, parameter.schema)
+    } else {
+      "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, parameter.schema) ++ ">"
+    } ++ ",",
   )
 
 let renderParamsType = (operation: Ir.operation): array<string> => {
-  let fieldNames =
-    Belt.Array.concat(
-      Belt.Array.map(operation.parameters, parameter => parameter.name),
-      switch operation.requestBody {
-      | Some(_) => ["body"]
-      | None => []
-      },
-    )
+  let fieldNames = Belt.Array.concat(
+    Array.map(operation.parameters, parameter => parameter.name),
+    switch operation.requestBody {
+    | Some(_) => ["body"]
+    | None => []
+    },
+  )
   let quoteLabels = Printer.shouldQuoteRecordLabels(fieldNames)
 
-  let bodyField =
-    switch operation.requestBody {
-    | None => []
-    | Some(body) => [
-        Printer.indentLine(
-          ~level=1,
-          Printer.recordLabel(~quoteAll=quoteLabels, "body")
-          ++ ": "
-          ++ (
-            if body.required {
-              Printer.modelType(~qualifiedNamedRefs=true, body.schema)
-            } else {
-              "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, body.schema) ++ ">"
-            }
-          )
-          ++ ",",
-        ),
-      ]
-    }
+  let bodyField = switch operation.requestBody {
+  | None => []
+  | Some(body) => [
+      Printer.indentLine(
+        ~level=1,
+        Printer.recordLabel(~quoteAll=quoteLabels, "body") ++
+        ": " ++
+        if body.required {
+          Printer.modelType(~qualifiedNamedRefs=true, body.schema)
+        } else {
+          "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, body.schema) ++ ">"
+        } ++ ",",
+      ),
+    ]
+  }
 
   let fields = Belt.Array.concat(
-    Belt.Array.map(operation.parameters, parameter => renderParameterField(~quoteLabels, parameter)),
+    Array.map(operation.parameters, parameter => renderParameterField(~quoteLabels, parameter)),
     bodyField,
   )
 
-  Belt.Array.concatMany([
-    ["type " ++ paramsTypeName(operation) ++ " = {"],
-    fields,
-    ["}"],
-  ])
+  Belt.Array.concatMany([["type " ++ paramsTypeName(operation) ++ " = {"], fields, ["}"]])
 }
 
 let renderParameter = (parameter: Ir.parameter): array<string> => [
@@ -98,9 +85,8 @@ let renderParameter = (parameter: Ir.parameter): array<string> => [
   "      name: " ++ Printer.quote(parameter.name) ++ ",",
   "      location: " ++ Printer.quote(parameter.location) ++ ",",
   "      required: " ++ Printer.boolLiteral(parameter.required) ++ ",",
-  "      schema: OpenapiRescriptRuntime.Schema.toAny("
-  ++ Printer.schemaExpr(~qualified=true, parameter.schema)
-  ++ "),",
+  "      schema: OpenapiRescriptRuntime.Schema.toAny(" ++
+  Printer.schemaExpr(~qualified=true, parameter.schema) ++ "),",
   "    },",
 ]
 
@@ -110,22 +96,19 @@ let renderRequestBody = (requestBody: option<Ir.requestBody>): array<string> =>
   | Some(body) => [
       "  requestBody: Some({",
       "    required: " ++ Printer.boolLiteral(body.required) ++ ",",
-      "    schema: OpenapiRescriptRuntime.Schema.toAny("
-      ++ Printer.schemaExpr(~qualified=true, body.schema)
-      ++ "),",
+      "    schema: OpenapiRescriptRuntime.Schema.toAny(" ++
+      Printer.schemaExpr(~qualified=true, body.schema) ++ "),",
       "  }),",
     ]
   }
 
 let renderResponse = (response: Ir.response): array<string> => {
-  let schemaLine =
-    switch response.schema {
-    | None => "None"
-    | Some(schema) =>
-      "Some(OpenapiRescriptRuntime.Schema.toAny("
-      ++ Printer.schemaExpr(~qualified=true, schema)
-      ++ "))"
-    }
+  let schemaLine = switch response.schema {
+  | None => "None"
+  | Some(schema) =>
+    "Some(OpenapiRescriptRuntime.Schema.toAny(" ++
+    Printer.schemaExpr(~qualified=true, schema) ++ "))"
+  }
 
   [
     "    {",
@@ -152,18 +135,21 @@ let renderSecurityScheme = (scheme: Ir.securityScheme): array<string> => [
 
 let renderOperationValue = (~document: Ir.document, operation: Ir.operation): array<string> => {
   let parameterLines = ref([])
-  Belt.Array.forEach(operation.parameters, parameter =>
+  Array.forEach(operation.parameters, parameter =>
     parameterLines.contents = Belt.Array.concat(parameterLines.contents, renderParameter(parameter))
   )
 
   let responseLines = ref([])
-  Belt.Array.forEach(operation.responses, response =>
+  Array.forEach(operation.responses, response =>
     responseLines.contents = Belt.Array.concat(responseLines.contents, renderResponse(response))
   )
 
   let securitySchemeLines = ref([])
-  Belt.Array.forEach(document.securitySchemes, scheme =>
-    securitySchemeLines.contents = Belt.Array.concat(securitySchemeLines.contents, renderSecurityScheme(scheme))
+  Array.forEach(document.securitySchemes, scheme =>
+    securitySchemeLines.contents = Belt.Array.concat(
+      securitySchemeLines.contents,
+      renderSecurityScheme(scheme),
+    )
   )
 
   Belt.Array.concatMany([
@@ -172,28 +158,20 @@ let renderOperationValue = (~document: Ir.document, operation: Ir.operation): ar
     ["  method: " ++ Printer.quote(operation.method) ++ ","],
     ["  path: " ++ Printer.quote(operation.path) ++ ","],
     ["  tags: " ++ Printer.stringArray(operation.tags) ++ ","],
-    if Belt.Array.length(parameterLines.contents) == 0 {
+    if Array.length(parameterLines.contents) == 0 {
       ["  parameters: [],"]
     } else {
-      Belt.Array.concatMany([
-        ["  parameters: ["],
-        parameterLines.contents,
-        ["  ],"],
-      ])
+      Belt.Array.concatMany([["  parameters: ["], parameterLines.contents, ["  ],"]])
     },
     renderRequestBody(operation.requestBody),
     ["  responses: ["],
     responseLines.contents,
     ["  ],"],
     ["  security: " ++ Printer.stringMatrix(effectiveSecurity(~document, ~operation)) ++ ","],
-    if Belt.Array.length(securitySchemeLines.contents) == 0 {
+    if Array.length(securitySchemeLines.contents) == 0 {
       ["  securitySchemes: [],"]
     } else {
-      Belt.Array.concatMany([
-        ["  securitySchemes: ["],
-        securitySchemeLines.contents,
-        ["  ],"],
-      ])
+      Belt.Array.concatMany([["  securitySchemes: ["], securitySchemeLines.contents, ["  ],"]])
     },
     ["}"],
   ])
@@ -219,15 +197,15 @@ let renderOperation = (~document: Ir.document, operation: Ir.operation): array<s
 let collectTags = (document: Ir.document): array<string> => {
   let tags = ref([])
 
-  Belt.Array.forEach(document.tags, tag => {
-    if !Belt.Array.some(tags.contents, existing => existing == tag) {
+  Array.forEach(document.tags, tag => {
+    if !Array.some(tags.contents, existing => existing == tag) {
       tags.contents = Belt.Array.concat(tags.contents, [tag])
     }
   })
 
-  Belt.Array.forEach(document.operations, operation => {
-    Belt.Array.forEach(operationTags(operation), tag => {
-      if !Belt.Array.some(tags.contents, existing => existing == tag) {
+  Array.forEach(document.operations, operation => {
+    Array.forEach(operationTags(operation), tag => {
+      if !Array.some(tags.contents, existing => existing == tag) {
         tags.contents = Belt.Array.concat(tags.contents, [tag])
       }
     })
@@ -237,12 +215,16 @@ let collectTags = (document: Ir.document): array<string> => {
 }
 
 let operationHasTag = (~tag: string, ~operation: Ir.operation): bool =>
-  Belt.Array.some(operationTags(operation), operationTag => operationTag == tag)
+  Array.some(operationTags(operation), operationTag => operationTag == tag)
 
 let rec uniqueModuleName = (~base: string, ~seen: array<string>, ~suffix: int=1): string => {
-  let candidate = if suffix == 1 {base} else {base ++ Int.toString(suffix)}
+  let candidate = if suffix == 1 {
+    base
+  } else {
+    base ++ Int.toString(suffix)
+  }
 
-  if Belt.Array.some(seen, existing => existing == candidate) {
+  if Array.some(seen, existing => existing == candidate) {
     uniqueModuleName(~base, ~seen, ~suffix=suffix + 1)
   } else {
     candidate
@@ -253,7 +235,7 @@ let collectTagModules = (document: Ir.document): array<tagModule> => {
   let seenModuleNames = ref([])
   let tagModules = ref([])
 
-  Belt.Array.forEach(collectTags(document), tag => {
+  Array.forEach(collectTags(document), tag => {
     let moduleName = uniqueModuleName(~base=Printer.moduleName(tag), ~seen=seenModuleNames.contents)
     seenModuleNames.contents = Belt.Array.concat(seenModuleNames.contents, [moduleName])
     tagModules.contents = Belt.Array.concat(tagModules.contents, [{tag, moduleName}])
@@ -269,7 +251,7 @@ let emitForTag = (
 ): Printer.file => {
   let body = ref([])
 
-  Belt.Array.forEachWithIndex(operations, (index, operation) => {
+  Array.forEachWithIndex(operations, (operation, index) => {
     if index > 0 {
       body.contents = Belt.Array.concat(body.contents, [""])
     }
@@ -279,10 +261,7 @@ let emitForTag = (
 
   Printer.makeFile(
     ~path=tagModule.moduleName ++ ".res",
-    ~lines=Belt.Array.concat([
-      "// Generated by openapi-rescript-core.",
-      "",
-    ], body.contents),
+    ~lines=Belt.Array.concat(["// Generated by openapi-rescript-core.", ""], body.contents),
   )
 }
 
@@ -290,13 +269,18 @@ let emitAll = (document: Ir.document): array<Printer.file> => {
   let tagModules = collectTagModules(document)
   let files = ref([])
 
-  Belt.Array.forEach(tagModules, tagModule => {
-    let operations = Belt.Array.keep(document.operations, operation => operationHasTag(~tag=tagModule.tag, ~operation))
-    files.contents = Belt.Array.concat(files.contents, [emitForTag(~document, ~tagModule, ~operations)])
+  Array.forEach(tagModules, tagModule => {
+    let operations = Belt.Array.keep(document.operations, operation =>
+      operationHasTag(~tag=tagModule.tag, ~operation)
+    )
+    files.contents = Belt.Array.concat(
+      files.contents,
+      [emitForTag(~document, ~tagModule, ~operations)],
+    )
   })
 
   files.contents
 }
 
 let moduleNames = (document: Ir.document): array<string> =>
-  Belt.Array.map(collectTagModules(document), tagModule => tagModule.moduleName)
+  Array.map(collectTagModules(document), tagModule => tagModule.moduleName)
