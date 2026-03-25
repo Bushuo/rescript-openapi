@@ -171,12 +171,12 @@ and decodeEnumSchema = (~path: array<string>, schemaObject: dict<JSON.t>): resul
   switch Dict.get(schemaObject, "type")->Belt.Option.flatMap(JSON.Decode.string) {
   | Some("string") =>
     switch decodeEnumValues(~path, schemaObject) {
-    | Ok(values) => Ok(Ir.StringEnum({name: "", values}))
+    | Ok(values) => Ok(Ir.StringEnum({name: "", values, path: at(path, "enum")}))
     | Error(problem) => Error(problem)
     }
   | None =>
     switch decodeEnumValues(~path, schemaObject) {
-    | Ok(values) => Ok(Ir.StringEnum({name: "", values}))
+    | Ok(values) => Ok(Ir.StringEnum({name: "", values, path: at(path, "enum")}))
     | Error(problem) => Error(problem)
     }
   | Some(_) =>

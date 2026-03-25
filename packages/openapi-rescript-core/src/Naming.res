@@ -344,3 +344,34 @@ let validateEnumConstructors = (~path: array<string>, values: array<string>): re
   | None => Ok()
   }
 }
+
+let validateReservedEnumConstructor = (
+  ~path: array<string>,
+  ~reservedConstructorName: string,
+  values: array<string>,
+): result<unit> => {
+  let error = ref(None)
+
+  Array.forEachWithIndex(values, (value, index) =>
+    switch error.contents {
+    | Some(_) => ()
+    | None =>
+      let constructorName = enumConstructorName(value)
+      if constructorName == reservedConstructorName {
+        error.contents = Some(
+          Diagnostics.make(
+            ~path=Belt.Array.concat(path, [Int.toString(index)]),
+            ~message=
+              "Enum constructor collision with reserved open enum constructor: " ++
+              reservedConstructorName,
+          ),
+        )
+      }
+    }
+  )
+
+  switch error.contents {
+  | Some(problem) => Error(problem)
+  | None => Ok()
+  }
+}

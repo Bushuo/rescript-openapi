@@ -156,6 +156,7 @@ describe("decodeDocument", () => {
       schema: {
         TAG: "StringEnum",
         name: "SessionState",
+        path: ["components", "schemas", "SessionState", "enum"],
         values: ["draft", "active", "archived"],
       },
     })
@@ -257,6 +258,7 @@ describe("decodeDocument", () => {
       schema: {
         TAG: "StringEnum",
         name: "PetState",
+        path: ["components", "schemas", "PetState", "enum"],
         values: ["available", "adopted"],
       },
     })

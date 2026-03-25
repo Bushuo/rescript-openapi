@@ -441,7 +441,7 @@ let addLiftedEnum = (
     reservedNames.contents = Belt.Array.concat(reservedNames.contents, [name])
     liftedSchemas.contents = Belt.Array.concat(liftedSchemas.contents, [{
       name,
-      schema: Ir.StringEnum({name, values}),
+      schema: Ir.StringEnum({name, values, path: at(path, "enum")}),
     }])
     Ok(Ir.NamedRef(enumRef(name)))
   }
@@ -457,8 +457,8 @@ let rec liftEnumSchema = (
   switch schema {
   | Ir.Scalar(_) => Ok(schema)
   | Ir.NamedRef(_) => Ok(schema)
-  | Ir.StringEnum({name: _, values}) =>
-    switch Naming.validateEnumConstructors(~path=at(path, "enum"), values) {
+  | Ir.StringEnum({name: _, values, path: enumPath}) =>
+    switch Naming.validateEnumConstructors(~path=enumPath, values) {
     | Error(problem) => Error(problem)
     | Ok() =>
       let name = Naming.enumTypeName(~scope, ~segments)
@@ -503,9 +503,10 @@ let liftNamedSchemaEnums = (
   let path = ["components", "schemas", namedSchema.name]
 
   switch namedSchema.schema {
-  | Ir.StringEnum({name: _, values}) =>
-    switch Naming.validateEnumConstructors(~path=at(path, "enum"), values) {
-    | Ok() => Ok({...namedSchema, schema: Ir.StringEnum({name: namedSchema.name, values})})
+  | Ir.StringEnum({name: _, values, path: enumPath}) =>
+    switch Naming.validateEnumConstructors(~path=enumPath, values) {
+    | Ok() =>
+      Ok({...namedSchema, schema: Ir.StringEnum({name: namedSchema.name, values, path: enumPath})})
     | Error(problem) => Error(problem)
     }
   | schema =>

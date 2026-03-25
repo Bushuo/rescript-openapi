@@ -4,7 +4,7 @@ type enumMode =
 
 type rec schema =
   | Scalar(string)
-  | StringEnum({name: string, values: array<string>})
+  | StringEnum({name: string, values: array<string>, path: array<string>})
   | Array(schema)
   | Object(array<objectField>)
   | NamedRef(string)

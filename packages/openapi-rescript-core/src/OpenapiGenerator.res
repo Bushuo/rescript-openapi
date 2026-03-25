@@ -27,6 +27,29 @@ let decodeDocument = OpenapiDecode.decodeDocument
 
 let defaultOptions: options = {enumMode: Ir.Open}
 
+let validateCodegenOptions = (document: Ir.document, options: options): result<unit, Diagnostics.diagnostic> => {
+  let error = ref(None)
+
+  if options.enumMode == Ir.Open {
+    Array.forEach(document.schemas, schema =>
+      switch (error.contents, schema.schema) {
+      | (Some(_), _) => ()
+      | (None, Ir.StringEnum({values, path, _})) =>
+        switch Naming.validateReservedEnumConstructor(~path, ~reservedConstructorName="Unknown", values) {
+        | Ok() => ()
+        | Error(problem) => error.contents = Some(problem)
+        }
+      | (None, _) => ()
+      }
+    )
+  }
+
+  switch error.contents {
+  | Some(problem) => Error(problem)
+  | None => Ok()
+  }
+}
+
 let emitFiles = (document: Ir.document, options: options): array<Printer.file> => {
   let clientFile = EmitClient.emit(document)
   let indexFile = EmitIndex.emit(~tagModules=EmitTagModule.moduleNames(document))
@@ -39,6 +62,10 @@ let emitFiles = (document: Ir.document, options: options): array<Printer.file> =
 
 let generate = (input: JSON.t, ~options: options=defaultOptions): output =>
   switch decodeDocument(input) {
-  | Ok(document) => success(document, emitFiles(document, options))
+  | Ok(document) =>
+    switch validateCodegenOptions(document, options) {
+    | Ok() => success(document, emitFiles(document, options))
+    | Error(error) => failure(error)
+    }
   | Error(error) => failure(error)
   }

@@ -116,6 +116,36 @@ describe("codegen", () => {
     expect(closedSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
   })
 
+  it("rejects open enums when a declared value normalizes to the reserved Unknown constructor", () => {
+    let reservedUnknownEnum = {
+      openapi: "3.1.0",
+      info: {
+        title: "Reserved Unknown Enum API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          Status: {
+            type: "string",
+            enum: ["unknown", "ready"],
+          },
+        },
+      },
+      paths: {},
+    }
+
+    expect(generateWithOptions(reservedUnknownEnum, {enumMode: "open"})).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Status", "enum", "0"],
+        message: "Enum constructor collision with reserved open enum constructor: Unknown",
+      },
+    })
+    expect(generateWithOptions(reservedUnknownEnum, {enumMode: "closed"})).toMatchObject({
+      ok: true,
+    })
+  })
+
   it("preserves schema-less responses as None in emitted metadata", () => {
     let noBodyResponseFixture = {
       openapi: "3.1.0",
