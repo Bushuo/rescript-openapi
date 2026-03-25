@@ -35,6 +35,16 @@ describe("parseCliArgs", () => {
     })
   })
 
+  it("rejects unknown options in the third slot", () => {
+    expect(parseCliArgs(["fixtures/spec.yaml", "out", "--bad"])).toEqual({
+      ok: false,
+      diagnostic: {
+        path: [],
+        message: "Unknown option: --bad",
+      },
+    })
+  })
+
   it("rejects invalid enum mode values with a structured diagnostic", () => {
     expect(parseCliArgs(["--enum-mode=banana", "fixtures/spec.yaml"])).toEqual({
       ok: false,

@@ -49,7 +49,6 @@ describe("generateClient", () => {
       expect(openResult.stdout).toBe("")
       expect(openResult.stderr).not.toContain("Usage: openapi-rescript")
       expect(JSON.parse(openResult.stderr)).toMatchObject({
-        path: expect.any(Array),
         message: "Unsupported schema construct: enum",
       })
     } finally {
@@ -67,7 +66,6 @@ describe("generateClient", () => {
       expect(closedResult.stdout).toBe("")
       expect(closedResult.stderr).not.toContain("Usage: openapi-rescript")
       expect(JSON.parse(closedResult.stderr)).toMatchObject({
-        path: expect.any(Array),
         message: "Unsupported schema construct: enum",
       })
     } finally {
@@ -111,6 +109,27 @@ describe("generateClient", () => {
       expect(JSON.parse(result.stderr)).toEqual({
         path: [],
         message: "Invalid enum mode: banana",
+      })
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rejects unknown options in the third slot with a structured diagnostic", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const result = runCliArgs([
+        resolve("fixtures/specs/string-enum-regression.yaml"),
+        targetDir,
+        "--bad",
+      ])
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(JSON.parse(result.stderr)).toEqual({
+        path: [],
+        message: "Unknown option: --bad",
       })
     } finally {
       rmSync(targetDir, {recursive: true, force: true})

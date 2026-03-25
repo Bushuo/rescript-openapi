@@ -70,7 +70,16 @@ export function parseCliArgs(args) {
     }
   }
 
-  if (args[offset + 2] !== undefined) {
+  const extraArg = args[offset + 2]
+
+  if (extraArg?.startsWith("--")) {
+    return {
+      ok: false,
+      diagnostic: structuredDiagnostic(`Unknown option: ${extraArg}`),
+    }
+  }
+
+  if (extraArg !== undefined) {
     return {
       ok: false,
       diagnostic: structuredDiagnostic("Usage: openapi-rescript <spec-file> [output-dir]"),
