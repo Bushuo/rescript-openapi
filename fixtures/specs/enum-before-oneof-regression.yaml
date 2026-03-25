@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Enum Before OneOf Regression
+  version: 1.0.0
+paths:
+  /status:
+    get:
+      operationId: getStatus
+      responses:
+        "200":
+          description: Current backend status
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - state
+                  - details
+                properties:
+                  state:
+                    type: string
+                    enum:
+                      - healthy
+                      - degraded
+                  details:
+                    oneOf:
+                      - type: string
+                      - type: integer

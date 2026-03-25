@@ -39,17 +39,30 @@ describe("generateClient", () => {
     }
   })
 
-  it("accepts the default open enum mode through the CLI", () => {
+  it("reports oneOf instead of enum for the default open enum mode regression fixture", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 
     try {
-      const openResult = runCli(resolve("fixtures/specs/string-enum-regression.yaml"), targetDir)
+      const openResult = runCli(resolve("fixtures/specs/enum-before-oneof-regression.yaml"), targetDir)
 
       expect(openResult.exitCode).toBe(1)
       expect(openResult.stdout).toBe("")
       expect(openResult.stderr).not.toContain("Usage: openapi-rescript")
       expect(JSON.parse(openResult.stderr)).toMatchObject({
-        message: "Unsupported schema construct: enum",
+        path: [
+          "paths",
+          "/status",
+          "get",
+          "responses",
+          "200",
+          "content",
+          "application/json",
+          "schema",
+          "properties",
+          "details",
+          "oneOf",
+        ],
+        message: "Unsupported schema construct: oneOf",
       })
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
@@ -62,12 +75,13 @@ describe("generateClient", () => {
     try {
       const closedResult = runCli(resolve("fixtures/specs/string-enum-regression.yaml"), targetDir, ["--enum-mode=closed"])
 
-      expect(closedResult.exitCode).toBe(1)
+      expect(closedResult.exitCode).toBe(0)
       expect(closedResult.stdout).toBe("")
-      expect(closedResult.stderr).not.toContain("Usage: openapi-rescript")
-      expect(JSON.parse(closedResult.stderr)).toMatchObject({
-        message: "Unsupported schema construct: enum",
-      })
+      expect(closedResult.stderr).toBe("")
+      expect(readdirSync(targetDir)).toEqual(
+        expect.arrayContaining(["Client.res", "Default_.res", "Index.res", "Models.res", "Schemas.res"])
+      )
+      expect(readFileSync(join(targetDir, "Models.res"), "utf8")).not.toContain("Unknown(string)")
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
     }

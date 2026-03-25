@@ -11,7 +11,7 @@ This repository is a `pnpm` workspace with three packages:
 The generator CLI is not exposed through a root `pnpm exec` command in this repository. Use the repository-local entrypoint directly:
 
 ```bash
-node packages/openapi-rescript-cli/bin/openapi-rescript.mjs <spec-file> [output-dir]
+node packages/openapi-rescript-cli/bin/openapi-rescript.mjs [--enum-mode=open|closed] <spec-file> [output-dir]
 ```
 
 ## Install
@@ -38,6 +38,12 @@ Generate the sample Petstore client into a temporary directory:
 mkdir -p ./tmp/petstore-client
 node packages/openapi-rescript-cli/bin/openapi-rescript.mjs fixtures/specs/petstore.yaml ./tmp/petstore-client
 ls ./tmp/petstore-client
+```
+
+String enums are supported. The CLI defaults to `--enum-mode=open`, which preserves forward compatibility by generating an `Unknown(string)` constructor for unrecognized values. Pass `--enum-mode=closed` if you want generated enums to accept only the declared OpenAPI values.
+
+```bash
+node packages/openapi-rescript-cli/bin/openapi-rescript.mjs --enum-mode=closed fixtures/specs/petstore.yaml ./tmp/petstore-client
 ```
 
 Expected output files:
@@ -74,6 +80,7 @@ V1 supports a strict subset of OpenAPI 3.1:
 - tags, operations, parameters, request bodies, JSON responses, status codes, and security declarations
 - JSON media types only, including `application/json` and `application/*+json`
 - auth support limited to `apiKey` in header/query/cookie plus `http` basic and bearer schemes
+- string enums in both default open mode and `--enum-mode=closed`
 
 Unsupported constructs are rejected instead of being approximated.
 
