@@ -174,6 +174,8 @@ let makeUpperIdentifier = (tokens: array<string>): string => uppercaseHead(makeI
 
 let sanitizeOperationId = (operationId: string): string => makeIdentifier(tokenize(operationId))
 
+let emittedTypeName = (name: string): string => sanitizeOperationId(name)
+
 let derivePathTokens = (path: string): array<string> => {
   let tokens = ref([])
 
@@ -300,17 +302,20 @@ let ensureUniqueEnumTypeName = (
   ~path: array<string>,
   ~existingNames: array<string>,
   typeName: string,
-): result<unit> =>
-  if Array.some(existingNames, existing => existing == typeName) {
+): result<unit> => {
+  let normalizedTypeName = emittedTypeName(typeName)
+
+  if Array.some(existingNames, existing => emittedTypeName(existing) == normalizedTypeName) {
     Error(
       Diagnostics.make(
         ~path,
-        ~message="Enum type name collision after normalization: " ++ typeName,
+        ~message="Enum type name collision after normalization: " ++ normalizedTypeName,
       ),
     )
   } else {
     Ok()
   }
+}
 
 let validateEnumConstructors = (~path: array<string>, values: array<string>): result<unit> => {
   let seen = ref([])

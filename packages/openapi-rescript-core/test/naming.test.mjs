@@ -318,6 +318,53 @@ describe("naming and auth normalization", () => {
     })
   })
 
+  it("rejects collisions between lifted enum names and existing schema names after normalization", () => {
+    let collidingExistingSchema = {
+      openapi: "3.1.0",
+      info: {
+        title: "Enum Existing Schema Collision API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          ListUsersParamSort: {
+            type: "string",
+          },
+        },
+      },
+      paths: {
+        "/users": {
+          get: {
+            operationId: "listUsers",
+            parameters: [
+              {
+                name: "sort",
+                in: "query",
+                schema: {
+                  type: "string",
+                  enum: ["asc", "desc"],
+                },
+              },
+            ],
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(generate(collidingExistingSchema)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths", "/users", "get", "parameters", "0", "schema"],
+        message: "Enum type name collision after normalization: listUsersParamSort",
+      },
+    })
+  })
+
   it("rejects enum constructor collisions after normalization", () => {
     let collidingConstructors = {
       openapi: "3.1.0",

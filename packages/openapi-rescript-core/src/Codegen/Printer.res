@@ -50,7 +50,7 @@ let boolLiteral = (value: bool): string =>
 
 let quote = (value: string): string => jsonStringify(value)
 
-let typeName = (value: string): string => Naming.sanitizeOperationId(value)
+let typeName = (value: string): string => Naming.emittedTypeName(value)
 
 let reservedRecordLabels = [
   "and",
