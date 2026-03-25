@@ -35,6 +35,14 @@ let emitSchema = (schema: Ir.namedSchema): array<string> =>
       fieldLines,
       ["])"],
     ])
+  | Ir.StringEnum(_) => [
+      "let " ++
+      Printer.typeName(schema.name) ++
+      ": t<Models." ++
+      Printer.typeName(schema.name) ++
+      "> = " ++
+      Printer.schemaExpr(Ir.Scalar("string")),
+    ]
   | value => [
       "let " ++
       Printer.typeName(schema.name) ++

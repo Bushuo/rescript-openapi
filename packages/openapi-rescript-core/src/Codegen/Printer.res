@@ -175,6 +175,7 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.Scalar("number") => "float"
   | Ir.Scalar("boolean") => "bool"
   | Ir.Scalar(_) => "Js.Json.t"
+  | Ir.StringEnum(_) => "string"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
   | Ir.NamedRef(reference) =>
     if qualifiedNamedRefs {
@@ -222,6 +223,12 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
       "Schemas.boolean"
     } else {
       "boolean"
+    }
+  | Ir.StringEnum(_) =>
+    if qualified {
+      "Schemas.string"
+    } else {
+      "string"
     }
   | Ir.Scalar(_) =>
     if qualified {

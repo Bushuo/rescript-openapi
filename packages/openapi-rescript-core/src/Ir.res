@@ -1,5 +1,10 @@
+type enumMode =
+  | Open
+  | Closed
+
 type rec schema =
   | Scalar(string)
+  | StringEnum({name: string, values: array<string>})
   | Array(schema)
   | Object(array<objectField>)
   | NamedRef(string)

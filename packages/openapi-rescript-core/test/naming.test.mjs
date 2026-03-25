@@ -11,6 +11,11 @@ const duplicateOperationIds = JSON.parse(
 const authenticatedApi = JSON.parse(
   readFileSync(new URL("./fixtures/authenticated-api.normalized.json", import.meta.url), "utf8"),
 )
+const normalizedEnums = JSON.parse(
+  readFileSync(new URL("./fixtures/enums.normalized.json", import.meta.url), "utf8"),
+)
+
+const generatedFile = (output, path) => output.files.find(file => file.path === path)?.contents
 
 describe("naming and auth normalization", () => {
   it("prefers unique operationId values for normalized operation names", () => {
@@ -253,6 +258,123 @@ describe("naming and auth normalization", () => {
       [["BasicAuth"]],
       [["ApiKeyHeader"], ["ApiKeyQuery"], ["ApiKeyCookie"]],
     ])
+  })
+
+  it("lifts reachable enums into deterministic generated model type names", () => {
+    let output = generate(normalizedEnums)
+    let generatedModels = generatedFile(output, "Models.res")
+
+    expect(output.ok).toBe(true)
+    expect(generatedModels).toContain("type listUsersParamSort =")
+    expect(generatedModels).toContain("type createSessionRequestState =")
+    expect(generatedModels).toContain("type getSessionResponseState =")
+  })
+
+  it("rejects lifted enum type name collisions after normalization", () => {
+    let collidingInlineEnums = {
+      openapi: "3.1.0",
+      info: {
+        title: "Enum Type Collision API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/users": {
+          get: {
+            operationId: "listUsers",
+            parameters: [
+              {
+                name: "sort-order",
+                in: "query",
+                schema: {
+                  type: "string",
+                  enum: ["asc", "desc"],
+                },
+              },
+              {
+                name: "sort_order",
+                in: "query",
+                schema: {
+                  type: "string",
+                  enum: ["newest", "oldest"],
+                },
+              },
+            ],
+            responses: {
+              200: {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(generate(collidingInlineEnums)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["paths", "/users", "get", "parameters", "1", "schema"],
+        message: "Enum type name collision after normalization: listUsersParamSortOrder",
+      },
+    })
+  })
+
+  it("rejects enum constructor collisions after normalization", () => {
+    let collidingConstructors = {
+      openapi: "3.1.0",
+      info: {
+        title: "Enum Constructor Collision API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/sessions": {
+          post: {
+            operationId: "createSession",
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["state"],
+                    properties: {
+                      state: {
+                        type: "string",
+                        enum: ["in-progress", "in_progress"],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              201: {
+                description: "created",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    expect(generate(collidingConstructors)).toMatchObject({
+      ok: false,
+      error: {
+        path: [
+          "paths",
+          "/sessions",
+          "post",
+          "requestBody",
+          "content",
+          "application/json",
+          "schema",
+          "properties",
+          "state",
+          "enum",
+          "1",
+        ],
+        message: "Enum constructor collision after normalization: InProgress",
+      },
+    })
   })
 
   it("rejects unsupported OAuth security schemes", () => {

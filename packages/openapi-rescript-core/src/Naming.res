@@ -1,5 +1,11 @@
 type result<'a> = result<'a, Diagnostics.diagnostic>
 
+type enumScope =
+  | Component(string)
+  | Parameter(string, string)
+  | Request(string)
+  | Response(string)
+
 @send external split: (string, string) => array<string> = "split"
 @send external charAt: (string, int) => string = "charAt"
 @send external sliceFrom: (string, int) => string = "slice"
@@ -164,6 +170,8 @@ let makeIdentifier = (tokens: array<string>): string => {
   }
 }
 
+let makeUpperIdentifier = (tokens: array<string>): string => uppercaseHead(makeIdentifier(tokens))
+
 let sanitizeOperationId = (operationId: string): string => makeIdentifier(tokenize(operationId))
 
 let derivePathTokens = (path: string): array<string> => {
@@ -243,5 +251,91 @@ let normalizeOperations = (operations: array<Ir.operation>): result<array<Ir.ope
   switch error.contents {
   | Some(problem) => Error(problem)
   | None => Ok(normalized.contents)
+  }
+}
+
+let enumTypeName = (~scope: enumScope, ~segments: array<string>): string =>
+  switch scope {
+  | Component(schemaName) =>
+    if Array.length(segments) == 0 {
+      schemaName
+    } else {
+      makeIdentifier(
+        Belt.Array.concat(
+          tokenize(schemaName),
+          Belt.Array.concatMany(Array.map(segments, tokenize)),
+        ),
+      )
+    }
+  | Parameter(operationName, parameterName) =>
+    makeIdentifier(
+      Belt.Array.concatMany([
+        tokenize(operationName),
+        ["param"],
+        tokenize(parameterName),
+        Belt.Array.concatMany(Array.map(segments, tokenize)),
+      ]),
+    )
+  | Request(operationName) =>
+    makeIdentifier(
+      Belt.Array.concatMany([
+        tokenize(operationName),
+        ["request"],
+        Belt.Array.concatMany(Array.map(segments, tokenize)),
+      ]),
+    )
+  | Response(operationName) =>
+    makeIdentifier(
+      Belt.Array.concatMany([
+        tokenize(operationName),
+        ["response"],
+        Belt.Array.concatMany(Array.map(segments, tokenize)),
+      ]),
+    )
+  }
+
+let enumConstructorName = (wireValue: string): string => makeUpperIdentifier(tokenize(wireValue))
+
+let ensureUniqueEnumTypeName = (
+  ~path: array<string>,
+  ~existingNames: array<string>,
+  typeName: string,
+): result<unit> =>
+  if Array.some(existingNames, existing => existing == typeName) {
+    Error(
+      Diagnostics.make(
+        ~path,
+        ~message="Enum type name collision after normalization: " ++ typeName,
+      ),
+    )
+  } else {
+    Ok()
+  }
+
+let validateEnumConstructors = (~path: array<string>, values: array<string>): result<unit> => {
+  let seen = ref([])
+  let error = ref(None)
+
+  Array.forEachWithIndex(values, (value, index) =>
+    switch error.contents {
+    | Some(_) => ()
+    | None =>
+      let constructorName = enumConstructorName(value)
+      if Array.some(seen.contents, existing => existing == constructorName) {
+        error.contents = Some(
+          Diagnostics.make(
+            ~path=Belt.Array.concat(path, [Int.toString(index)]),
+            ~message="Enum constructor collision after normalization: " ++ constructorName,
+          ),
+        )
+      } else {
+        seen.contents = Belt.Array.concat(seen.contents, [constructorName])
+      }
+    }
+  )
+
+  switch error.contents {
+  | Some(problem) => Error(problem)
+  | None => Ok()
   }
 }

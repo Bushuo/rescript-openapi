@@ -73,6 +73,12 @@ let decodeStringArray = (~path: array<string>, json: JSON.t): result<array<strin
     )
   }
 
+let decodeEnumValues = (~path: array<string>, schemaObject: dict<JSON.t>): result<array<string>> =>
+  switch JsonDecode.requiredField(~path, schemaObject, "enum") {
+  | Error(problem) => Error(problem)
+  | Ok(enumJson) => decodeStringArray(~path=at(path, "enum"), enumJson)
+  }
+
 let decodeRequiredNames = (~path: array<string>, schemaObject: dict<JSON.t>): result<
   array<string>,
 > =>
@@ -116,7 +122,6 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
       "oneOf",
       "anyOf",
       "allOf",
-      "enum",
       "const",
       "not",
       "if",
@@ -136,22 +141,39 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
     switch Dict.get(schemaObject, "$ref") {
     | Some(_) => decodeRef(~path, schemaObject)
     | None =>
-      switch Dict.get(schemaObject, "type")->Belt.Option.flatMap(JSON.Decode.string) {
-      | Some("array") => decodeArraySchema(~path, schemaObject)
-      | Some("object") => decodeObjectSchema(~path, schemaObject)
-      | Some("string") => Ok(Ir.Scalar("string"))
-      | Some("integer") => Ok(Ir.Scalar("integer"))
-      | Some("number") => Ok(Ir.Scalar("number"))
-      | Some("boolean") => Ok(Ir.Scalar("boolean"))
-      | Some(kind) => unsupported(~path, ~feature="type:" ++ kind)
-      | None =>
-        if hasField(schemaObject, "properties") {
-          decodeObjectSchema(~path, schemaObject)
-        } else {
-          Error(Diagnostics.make(~path, ~message="Unsupported schema"))
+      if hasField(schemaObject, "enum") {
+        decodeEnumSchema(~path, schemaObject)
+      } else {
+        switch Dict.get(schemaObject, "type")->Belt.Option.flatMap(JSON.Decode.string) {
+        | Some("array") => decodeArraySchema(~path, schemaObject)
+        | Some("object") => decodeObjectSchema(~path, schemaObject)
+        | Some("string") => Ok(Ir.Scalar("string"))
+        | Some("integer") => Ok(Ir.Scalar("integer"))
+        | Some("number") => Ok(Ir.Scalar("number"))
+        | Some("boolean") => Ok(Ir.Scalar("boolean"))
+        | Some(kind) => unsupported(~path, ~feature="type:" ++ kind)
+        | None =>
+          if hasField(schemaObject, "properties") {
+            decodeObjectSchema(~path, schemaObject)
+          } else {
+            Error(Diagnostics.make(~path, ~message="Unsupported schema"))
+          }
         }
       }
     }
+  }
+
+and decodeEnumSchema = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir.schema> =>
+  switch Dict.get(schemaObject, "type")->Belt.Option.flatMap(JSON.Decode.string) {
+  | Some("string") =>
+    switch decodeEnumValues(~path, schemaObject) {
+    | Ok(values) => Ok(Ir.StringEnum({name: "", values}))
+    | Error(problem) => Error(problem)
+    }
+  | Some(_) =>
+    Error(Diagnostics.make(~path=at(path, "type"), ~message="Only string enums are supported"))
+  | None =>
+    Error(Diagnostics.make(~path=at(path, "type"), ~message="Only string enums are supported"))
   }
 
 and decodeArraySchema = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir.schema> =>

@@ -22,6 +22,7 @@ let renderSchema = (schema: Ir.namedSchema): array<string> =>
       Array.map(fields, field => renderField(~quoteLabels, field)),
       ["}"],
     ])
+  | Ir.StringEnum(_) => ["type " ++ Printer.typeName(schema.name) ++ " = string"]
   | value => ["type " ++ Printer.typeName(schema.name) ++ " = " ++ Printer.modelType(value)]
   }
 

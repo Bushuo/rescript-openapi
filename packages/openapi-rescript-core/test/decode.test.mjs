@@ -8,6 +8,11 @@ const normalizedPetstore = JSON.parse(
 const normalizedUnsupported = JSON.parse(
   readFileSync(new URL("./fixtures/unsupported-schema.normalized.json", import.meta.url), "utf8"),
 )
+const normalizedEnums = JSON.parse(
+  readFileSync(new URL("./fixtures/enums.normalized.json", import.meta.url), "utf8"),
+)
+
+const findSchema = (schemas, name) => schemas.find(schema => schema.name === name)
 
 describe("decodeDocument", () => {
   it("decodes a supported OpenAPI 3.1 document into IR", () => {
@@ -132,26 +137,124 @@ describe("decodeDocument", () => {
     })
   })
 
-  it("rejects unsupported schema keywords with precise paths", () => {
-    let unsupportedEnum = {
+  it("decodes reachable string enums into named IR schemas", () => {
+    let output = generate(normalizedEnums)
+
+    expect(output.ok).toBe(true)
+    expect(output.value.schemas.map(schema => schema.name)).toEqual(
+      expect.arrayContaining([
+        "Session",
+        "SessionState",
+        "sessionVisibility",
+        "listUsersParamSort",
+        "createSessionRequestState",
+        "getSessionResponseState",
+      ]),
+    )
+    expect(findSchema(output.value.schemas, "SessionState")).toEqual({
+      name: "SessionState",
+      schema: {
+        TAG: "StringEnum",
+        name: "SessionState",
+        values: ["draft", "active", "archived"],
+      },
+    })
+    expect(findSchema(output.value.schemas, "Session")).toEqual({
+      name: "Session",
+      schema: {
+        TAG: "Object",
+        _0: expect.arrayContaining([
+          {
+            name: "visibility",
+            required: true,
+            schema: {TAG: "NamedRef", _0: "#/components/schemas/sessionVisibility"},
+          },
+        ]),
+      },
+    })
+    expect(output.value.operations.find(operation => operation.name === "listUsers").parameters).toEqual([
+      {
+        name: "sort",
+        location: "query",
+        required: false,
+        schema: {TAG: "NamedRef", _0: "#/components/schemas/listUsersParamSort"},
+      },
+    ])
+    expect(output.value.operations.find(operation => operation.name === "createSession").requestBody)
+      .toEqual({
+        required: true,
+        schema: {
+          TAG: "Object",
+          _0: expect.arrayContaining([
+            {
+              name: "state",
+              required: true,
+              schema: {TAG: "NamedRef", _0: "#/components/schemas/createSessionRequestState"},
+            },
+          ]),
+        },
+      })
+    expect(output.value.operations.find(operation => operation.name === "getSession").responses).toEqual([
+      {
+        statusCode: "200",
+        schema: {
+          TAG: "Object",
+          _0: expect.arrayContaining([
+            {
+              name: "state",
+              required: true,
+              schema: {TAG: "NamedRef", _0: "#/components/schemas/getSessionResponseState"},
+            },
+          ]),
+        },
+      },
+    ])
+  })
+
+  it("rejects non-string enum base types with a precise path", () => {
+    let integerEnum = {
       ...normalizedPetstore,
       components: {
         ...normalizedPetstore.components,
         schemas: {
           ...normalizedPetstore.components.schemas,
-          Pet: {
-            type: "string",
-            enum: ["cat"],
+          PetId: {
+            type: "integer",
+            enum: [1, 2, 3],
           },
         },
       },
     }
 
-    expect(generate(unsupportedEnum)).toMatchObject({
+    expect(generate(integerEnum)).toMatchObject({
       ok: false,
       error: {
-        path: ["components", "schemas", "Pet", "enum"],
-        message: "Unsupported schema construct: enum",
+        path: ["components", "schemas", "PetId", "type"],
+        message: "Only string enums are supported",
+      },
+    })
+  })
+
+  it("rejects mixed enum value arrays with a precise path", () => {
+    let mixedEnum = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        schemas: {
+          ...normalizedPetstore.components.schemas,
+          PetState: {
+            type: "string",
+            enum: ["cat", 1],
+          },
+        },
+      },
+    }
+
+    expect(generate(mixedEnum)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "PetState", "enum", "1"],
+        message: "Expected string",
       },
     })
   })

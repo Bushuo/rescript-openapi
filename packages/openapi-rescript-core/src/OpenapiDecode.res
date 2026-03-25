@@ -423,6 +423,228 @@ let decodeSchemas = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.
     }
   }
 
+let enumRef = (name: string): string => "#/components/schemas/" ++ name
+
+let appendSegment = (segments: array<string>, segment: string): array<string> =>
+  Belt.Array.concat(segments, [segment])
+
+let addLiftedEnum = (
+  ~path: array<string>,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+  ~name: string,
+  ~values: array<string>,
+): result<Ir.schema> =>
+  switch Naming.ensureUniqueEnumTypeName(~path, ~existingNames=reservedNames.contents, name) {
+  | Error(problem) => Error(problem)
+  | Ok() =>
+    reservedNames.contents = Belt.Array.concat(reservedNames.contents, [name])
+    liftedSchemas.contents = Belt.Array.concat(liftedSchemas.contents, [{
+      name,
+      schema: Ir.StringEnum({name, values}),
+    }])
+    Ok(Ir.NamedRef(enumRef(name)))
+  }
+
+let rec liftEnumSchema = (
+  ~path: array<string>,
+  ~scope: Naming.enumScope,
+  ~segments: array<string>,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+  schema: Ir.schema,
+): result<Ir.schema> =>
+  switch schema {
+  | Ir.Scalar(_) => Ok(schema)
+  | Ir.NamedRef(_) => Ok(schema)
+  | Ir.StringEnum({name: _, values}) =>
+    switch Naming.validateEnumConstructors(~path=at(path, "enum"), values) {
+    | Error(problem) => Error(problem)
+    | Ok() =>
+      let name = Naming.enumTypeName(~scope, ~segments)
+      addLiftedEnum(~path, ~reservedNames, ~liftedSchemas, ~name, ~values)
+    }
+  | Ir.Array(item) =>
+    switch liftEnumSchema(
+      ~path=at(path, "items"),
+      ~scope,
+      ~segments=appendSegment(segments, "item"),
+      ~reservedNames,
+      ~liftedSchemas,
+      item,
+    ) {
+    | Ok(itemSchema) => Ok(Ir.Array(itemSchema))
+    | Error(problem) => Error(problem)
+    }
+  | Ir.Object(fields) =>
+    switch collectArray(fields, (field, _) =>
+      switch liftEnumSchema(
+        ~path=at(at(path, "properties"), field.name),
+        ~scope,
+        ~segments=appendSegment(segments, field.name),
+        ~reservedNames,
+        ~liftedSchemas,
+        field.schema,
+      ) {
+      | Ok(schema) => Ok({...field, schema})
+      | Error(problem) => Error(problem)
+      }
+    ) {
+    | Ok(nextFields) => Ok(Ir.Object(nextFields))
+    | Error(problem) => Error(problem)
+    }
+  }
+
+let liftNamedSchemaEnums = (
+  namedSchema: Ir.namedSchema,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+): result<Ir.namedSchema> => {
+  let path = ["components", "schemas", namedSchema.name]
+
+  switch namedSchema.schema {
+  | Ir.StringEnum({name: _, values}) =>
+    switch Naming.validateEnumConstructors(~path=at(path, "enum"), values) {
+    | Ok() => Ok({...namedSchema, schema: Ir.StringEnum({name: namedSchema.name, values})})
+    | Error(problem) => Error(problem)
+    }
+  | schema =>
+    switch liftEnumSchema(
+      ~path,
+      ~scope=Naming.Component(namedSchema.name),
+      ~segments=[],
+      ~reservedNames,
+      ~liftedSchemas,
+      schema,
+    ) {
+    | Ok(nextSchema) => Ok({...namedSchema, schema: nextSchema})
+    | Error(problem) => Error(problem)
+    }
+  }
+}
+
+let liftRequestBodyEnums = (
+  operation: Ir.operation,
+  requestBody: Ir.requestBody,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+): result<Ir.requestBody> =>
+  switch liftEnumSchema(
+    ~path=[
+      "paths",
+      operation.path,
+      operation.method,
+      "requestBody",
+      "content",
+      "application/json",
+      "schema",
+    ],
+    ~scope=Naming.Request(operation.name),
+    ~segments=[],
+    ~reservedNames,
+    ~liftedSchemas,
+    requestBody.schema,
+  ) {
+  | Ok(schema) => Ok({...requestBody, schema})
+  | Error(problem) => Error(problem)
+  }
+
+let liftResponseEnums = (
+  operation: Ir.operation,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+): result<array<Ir.response>> =>
+  collectArray(operation.responses, (response, _) =>
+    switch response.schema {
+    | None => Ok(response)
+    | Some(schema) =>
+      switch liftEnumSchema(
+        ~path=[
+          "paths",
+          operation.path,
+          operation.method,
+          "responses",
+          response.statusCode,
+          "content",
+          "application/json",
+          "schema",
+        ],
+        ~scope=Naming.Response(operation.name),
+        ~segments=[],
+        ~reservedNames,
+        ~liftedSchemas,
+        schema,
+      ) {
+      | Ok(nextSchema) => Ok({...response, schema: Some(nextSchema)})
+      | Error(problem) => Error(problem)
+      }
+    }
+  )
+
+let liftParameterEnums = (
+  operation: Ir.operation,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+): result<array<Ir.parameter>> =>
+  collectArray(operation.parameters, (parameter, index) =>
+    switch liftEnumSchema(
+      ~path=["paths", operation.path, operation.method, "parameters", Int.toString(index), "schema"],
+      ~scope=Naming.Parameter(operation.name, parameter.name),
+      ~segments=[],
+      ~reservedNames,
+      ~liftedSchemas,
+      parameter.schema,
+    ) {
+    | Ok(schema) => Ok({...parameter, schema})
+    | Error(problem) => Error(problem)
+    }
+  )
+
+let liftOperationEnums = (
+  operation: Ir.operation,
+  ~reservedNames: ref<array<string>>,
+  ~liftedSchemas: ref<array<Ir.namedSchema>>,
+): result<Ir.operation> =>
+  switch (
+    liftParameterEnums(operation, ~reservedNames, ~liftedSchemas),
+    switch operation.requestBody {
+    | None => Ok(None)
+    | Some(requestBody) =>
+      switch liftRequestBodyEnums(operation, requestBody, ~reservedNames, ~liftedSchemas) {
+      | Ok(nextBody) => Ok(Some(nextBody))
+      | Error(problem) => Error(problem)
+      }
+    },
+    liftResponseEnums(operation, ~reservedNames, ~liftedSchemas),
+  ) {
+  | (Ok(parameters), Ok(requestBody), Ok(responses)) =>
+    Ok({...operation, parameters, requestBody, responses})
+  | (Error(problem), _, _) => Error(problem)
+  | (_, Error(problem), _) => Error(problem)
+  | (_, _, Error(problem)) => Error(problem)
+  }
+
+let liftReachableEnums = (
+  ~operations: array<Ir.operation>,
+  ~schemas: array<Ir.namedSchema>,
+): result<(array<Ir.operation>, array<Ir.namedSchema>)> => {
+  let reservedNames = ref(Array.map(schemas, schema => schema.name))
+  let liftedSchemas = ref([])
+
+  switch collectArray(schemas, (schema, _) =>
+    liftNamedSchemaEnums(schema, ~reservedNames, ~liftedSchemas)
+  ) {
+  | Error(problem) => Error(problem)
+  | Ok(namedSchemas) =>
+    switch collectArray(operations, (operation, _) =>
+      liftOperationEnums(operation, ~reservedNames, ~liftedSchemas)
+    ) {
+    | Error(problem) => Error(problem)
+    | Ok(operations) => Ok((operations, Belt.Array.concat(namedSchemas, liftedSchemas.contents)))
+    }
+  }
+}
+
 let decodeSecuritySchemes = (~path: array<string>, root: dict<JSON.t>): result<
   array<Ir.securityScheme>,
 > =>
@@ -609,17 +831,21 @@ let decodeDocument = (input: JSON.t): result<Ir.document> =>
           switch Naming.normalizeOperations(operations) {
           | Error(problem) => Error(problem)
           | Ok(operations) =>
-            let document: Ir.document = {
-              openapiVersion,
-              title,
-              version,
-              tags,
-              security,
-              operations,
-              schemas,
-              securitySchemes,
+            switch liftReachableEnums(~operations, ~schemas) {
+            | Error(problem) => Error(problem)
+            | Ok((operations, schemas)) =>
+              let document: Ir.document = {
+                openapiVersion,
+                title,
+                version,
+                tags,
+                security,
+                operations,
+                schemas,
+                securitySchemes,
+              }
+              Ok(document)
             }
-            Ok(document)
           }
         | (Error(problem), _) => Error(problem)
         | (_, Error(problem)) => Error(problem)
