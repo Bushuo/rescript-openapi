@@ -19,8 +19,7 @@ external methodFromString: string => Fetch.method = "%identity"
 external dictFromUnknown: 'a => dict<unknown> = "%identity"
 @send
 external replaceAllString: (string, string, string) => string = "replaceAll"
-@val
-@scope("Promise")
+@val @scope("Promise")
 external resolvePromise: 'a => promise<'a> = "resolve"
 
 type authCredential = {
@@ -80,7 +79,8 @@ let exnMessage = (error: exn): string =>
   | None => "Unknown error"
   }
 
-let getValue = (params: 'params, key: string): option<unknown> => Dict.get(dictFromUnknown(params), key)
+let getValue = (params: 'params, key: string): option<unknown> =>
+  Dict.get(dictFromUnknown(params), key)
 
 let hasValue = (params: 'params, key: string): bool =>
   switch getValue(params, key) {
@@ -94,7 +94,11 @@ let findCredential = (client: t, schemeName: string): option<authCredential> =>
 let findSecurityScheme = (operation: jsonOperation, schemeName: string): option<securityScheme> =>
   Belt.Array.getBy(operation.securitySchemes, scheme => scheme.name == schemeName)
 
-let isRequirementSatisfied = (client: t, operation: jsonOperation, requirement: array<string>): bool =>
+let isRequirementSatisfied = (
+  client: t,
+  operation: jsonOperation,
+  requirement: array<string>,
+): bool =>
   Belt.Array.every(requirement, schemeName =>
     switch (findCredential(client, schemeName), findSecurityScheme(operation, schemeName)) {
     | (Some(_), Some(_)) => true
@@ -103,22 +107,29 @@ let isRequirementSatisfied = (client: t, operation: jsonOperation, requirement: 
   )
 
 let resolveSecurityRequirement = (client: t, operation: jsonOperation): option<array<string>> =>
-  Belt.Array.getBy(operation.security, requirement => isRequirementSatisfied(client, operation, requirement))
+  Belt.Array.getBy(operation.security, requirement =>
+    isRequirementSatisfied(client, operation, requirement)
+  )
 
 let reverseJsonString = (value: unknown, schema: Schema.any): string =>
   S.reverseConvertToJsonStringOrThrow(value, schema)
 
 let scalarToString = (json: JSON.t): string =>
-  switch Js.Json.decodeString(json) {
+  switch JSON.Decode.string(json) {
   | Some(value) => value
   | None =>
-    switch Js.Json.decodeNumber(json) {
+    switch JSON.Decode.float(json) {
     | Some(value) => Float.toString(value)
     | None =>
-      switch Js.Json.decodeBoolean(json) {
-      | Some(value) => if value {"true"} else {"false"}
+      switch JSON.Decode.bool(json) {
+      | Some(value) =>
+        if value {
+          "true"
+        } else {
+          "false"
+        }
       | None =>
-        switch Js.Json.decodeNull(json) {
+        switch JSON.Decode.null(json) {
         | Some(_) => "null"
         | None => JSON.stringifyAny(json)->Belt.Option.getWithDefault("")
         }
@@ -138,11 +149,10 @@ let setHeaderIfAbsent = (headers: Fetch.Headers.t, name: string, value: string) 
   }
 
 let appendCookie = (headers: Fetch.Headers.t, name: string, value: string) => {
-  let nextValue =
-    switch headers->Fetch.Headers.get("cookie") {
-    | Some(existing) if existing != "" => existing ++ "; " ++ name ++ "=" ++ value
-    | _ => name ++ "=" ++ value
-    }
+  let nextValue = switch headers->Fetch.Headers.get("cookie") {
+  | Some(existing) if existing != "" => existing ++ "; " ++ name ++ "=" ++ value
+  | _ => name ++ "=" ++ value
+  }
 
   headers->Fetch.Headers.set("cookie", nextValue)
 }
@@ -152,34 +162,36 @@ let applySecurity = (
   operation: jsonOperation,
   resolvedUrl: url,
   headers: Fetch.Headers.t,
-) => switch resolveSecurityRequirement(client, operation) {
-| None => ()
-| Some(requirement) =>
-  Belt.Array.forEach(requirement, schemeName =>
-    switch (findCredential(client, schemeName), findSecurityScheme(operation, schemeName)) {
-    | (Some(credential), Some(scheme)) =>
-      switch scheme.authKind {
-      | "apiKey" =>
-        switch (scheme.credentialName, scheme.location) {
-        | (Some(name), Some("header")) => headers->Fetch.Headers.set(name, credential.value)
-        | (Some(name), Some("query")) => resolvedUrl->searchParams->appendSearchParam(name, credential.value)
-        | (Some(name), Some("cookie")) => headers->appendCookie(name, credential.value)
+) =>
+  switch resolveSecurityRequirement(client, operation) {
+  | None => ()
+  | Some(requirement) =>
+    Belt.Array.forEach(requirement, schemeName =>
+      switch (findCredential(client, schemeName), findSecurityScheme(operation, schemeName)) {
+      | (Some(credential), Some(scheme)) =>
+        switch scheme.authKind {
+        | "apiKey" =>
+          switch (scheme.credentialName, scheme.location) {
+          | (Some(name), Some("header")) => headers->Fetch.Headers.set(name, credential.value)
+          | (Some(name), Some("query")) =>
+            resolvedUrl->searchParams->appendSearchParam(name, credential.value)
+          | (Some(name), Some("cookie")) => headers->appendCookie(name, credential.value)
+          | _ => ()
+          }
+        | "httpBearer" => headers->setHeaderIfAbsent("authorization", "Bearer " ++ credential.value)
+        | "httpBasic" =>
+          headers->setHeaderIfAbsent("authorization", "Basic " ++ btoa(credential.value))
         | _ => ()
         }
-      | "httpBearer" => headers->setHeaderIfAbsent("authorization", "Bearer " ++ credential.value)
-      | "httpBasic" => headers->setHeaderIfAbsent("authorization", "Basic " ++ btoa(credential.value))
       | _ => ()
       }
-    | _ => ()
-    }
-  )
-}
+    )
+  }
 
-let applyParameters = (
-  operation: jsonOperation,
-  params: 'params,
-  headers: Fetch.Headers.t,
-): result<(string, array<(string, string)>), OperationError.t> => {
+let applyParameters = (operation: jsonOperation, params: 'params, headers: Fetch.Headers.t): result<
+  (string, array<(string, string)>),
+  OperationError.t,
+> => {
   let path = ref(operation.path)
   let queryParams = ref([])
 
@@ -196,7 +208,10 @@ let applyParameters = (
         switch parameter.location {
         | "path" => path.contents = replacePathParameter(path.contents, parameter.name, encoded)
         | "query" =>
-          queryParams.contents = Belt.Array.concat(queryParams.contents, [(parameter.name, encoded)])
+          queryParams.contents = Belt.Array.concat(
+            queryParams.contents,
+            [(parameter.name, encoded)],
+          )
         | "header" => headers->Fetch.Headers.set(parameter.name, encoded)
         | "cookie" => headers->appendCookie(parameter.name, encoded)
         | _ => ()
@@ -206,7 +221,8 @@ let applyParameters = (
 
     Ok((path.contents, queryParams.contents))
   } catch {
-  | error => Error(OperationError.requestEncoding(~operationName=operation.name, ~message=exnMessage(error)))
+  | error =>
+    Error(OperationError.requestEncoding(~operationName=operation.name, ~message=exnMessage(error)))
   }
 }
 
@@ -221,7 +237,12 @@ let encodeRequestBody = (
     switch getValue(params, "body") {
     | None =>
       if requestBody.required {
-        Error(OperationError.requestEncoding(~operationName=operation.name, ~message="Missing required request body"))
+        Error(
+          OperationError.requestEncoding(
+            ~operationName=operation.name,
+            ~message="Missing required request body",
+          ),
+        )
       } else {
         Ok(None)
       }
@@ -233,7 +254,9 @@ let encodeRequestBody = (
         Ok(Some(Fetch.Body.string(encoded)))
       } catch {
       | error =>
-        Error(OperationError.requestEncoding(~operationName=operation.name, ~message=exnMessage(error)))
+        Error(
+          OperationError.requestEncoding(~operationName=operation.name, ~message=exnMessage(error)),
+        )
       }
     }
   }
@@ -282,9 +305,7 @@ let findDefaultResponse = (operation: jsonOperation): option<response> =>
   Belt.Array.getBy(operation.responses, response => response.statusCode == "default")
 
 let hasExplicitSuccessResponse = (operation: jsonOperation): bool =>
-  Belt.Array.some(operation.responses, response =>
-    String.startsWith(response.statusCode, "2")
-  )
+  Belt.Array.some(operation.responses, response => String.startsWith(response.statusCode, "2"))
 
 let findSuccessResponse = (operation: jsonOperation, status: int): option<response> =>
   switch findExplicitResponse(operation, status) {
@@ -307,11 +328,9 @@ let makeRequestInit = (
   | None => {method: method_, headers}
   }
 
-let callJson = async (
-  client: t,
-  operation: jsonOperation,
-  params: 'params,
-): promise<result<'response, OperationError.t>> => {
+let callJson = async (client: t, operation: jsonOperation, params: 'params): promise<
+  result<'response, OperationError.t>,
+> => {
   let headers = Fetch.Headers.fromArray(client.defaultHeaders)
   headers->Fetch.Headers.set("accept", "application/json")
 
@@ -319,7 +338,9 @@ let callJson = async (
   | Error(error) => resolvePromise(Error(error))
   | Ok((path, queryParams)) =>
     let requestUrl = makeUrl(path, client.baseUrl)
-    Belt.Array.forEach(queryParams, ((name, value)) => requestUrl->searchParams->appendSearchParam(name, value))
+    Belt.Array.forEach(queryParams, ((name, value)) =>
+      requestUrl->searchParams->appendSearchParam(name, value)
+    )
     let requestHeaders = Fetch.Headers.clone(headers)
     applySecurity(client, operation, requestUrl, requestHeaders)
 
@@ -332,7 +353,7 @@ let callJson = async (
           makeRequestInit(
             ~method_=methodFromString(operation.method->String.toUpperCase),
             ~headers=requestHeaders,
-            ~body=body,
+            ~body,
           ),
         )
         let status = response->Fetch.Response.status
@@ -341,13 +362,25 @@ let callJson = async (
         switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
         | (false, _) =>
           resolvePromise(
-            Error(OperationError.unexpectedStatus(~operationName=operation.name, ~status, ~body=responseText)),
+            Error(
+              OperationError.unexpectedStatus(
+                ~operationName=operation.name,
+                ~status,
+                ~body=responseText,
+              ),
+            ),
           )
         | (true, None) =>
           resolvePromise(
-            Error(OperationError.unexpectedStatus(~operationName=operation.name, ~status, ~body=responseText)),
+            Error(
+              OperationError.unexpectedStatus(
+                ~operationName=operation.name,
+                ~status,
+                ~body=responseText,
+              ),
+            ),
           )
-        | (true, Some({schema: None})) => resolvePromise(Ok(Obj.magic(())))
+        | (true, Some({schema: None})) => resolvePromise(Ok(Obj.magic()))
         | (true, Some({schema: Some(schema)})) =>
           try {
             resolvePromise(Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, schema))))
@@ -367,7 +400,11 @@ let callJson = async (
         }
       } catch {
       | error =>
-        resolvePromise(Error(OperationError.transport(~operationName=operation.name, ~message=exnMessage(error))))
+        resolvePromise(
+          Error(
+            OperationError.transport(~operationName=operation.name, ~message=exnMessage(error)),
+          ),
+        )
       }
     }
   }
