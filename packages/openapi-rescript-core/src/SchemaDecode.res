@@ -174,9 +174,12 @@ and decodeEnumSchema = (~path: array<string>, schemaObject: dict<JSON.t>): resul
     | Ok(values) => Ok(Ir.StringEnum({name: "", values}))
     | Error(problem) => Error(problem)
     }
-  | Some(_) =>
-    Error(Diagnostics.make(~path=at(path, "type"), ~message="Only string enums are supported"))
   | None =>
+    switch decodeEnumValues(~path, schemaObject) {
+    | Ok(values) => Ok(Ir.StringEnum({name: "", values}))
+    | Error(problem) => Error(problem)
+    }
+  | Some(_) =>
     Error(Diagnostics.make(~path=at(path, "type"), ~message="Only string enums are supported"))
   }
 

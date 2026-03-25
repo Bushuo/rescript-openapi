@@ -235,6 +235,33 @@ describe("decodeDocument", () => {
     })
   })
 
+  it("accepts untyped enums when all enum values are strings", () => {
+    let untypedStringEnum = {
+      ...normalizedPetstore,
+      components: {
+        ...normalizedPetstore.components,
+        schemas: {
+          ...normalizedPetstore.components.schemas,
+          PetState: {
+            enum: ["available", "adopted"],
+          },
+        },
+      },
+    }
+
+    let output = generate(untypedStringEnum)
+
+    expect(output.ok).toBe(true)
+    expect(findSchema(output.value.schemas, "PetState")).toEqual({
+      name: "PetState",
+      schema: {
+        TAG: "StringEnum",
+        name: "PetState",
+        values: ["available", "adopted"],
+      },
+    })
+  })
+
   it("rejects non-string enum base types with a precise path", () => {
     let integerEnum = {
       ...normalizedPetstore,
