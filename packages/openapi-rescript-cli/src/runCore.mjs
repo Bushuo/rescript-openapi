@@ -10,11 +10,11 @@ const generatorImportPaths = [
 
 let generatorPromise
 
-export async function runCore(entryPath, targetDir = process.cwd()) {
+export async function runCore(entryPath, targetDir = process.cwd(), options = {enumMode: "open"}) {
   try {
     const normalized = await parseInput(entryPath)
     const OpenapiGenerator = await loadGenerator()
-    const output = OpenapiGenerator.generate(normalized)
+    const output = OpenapiGenerator.generate(normalized, options)
 
     if (!output.ok) {
       return {

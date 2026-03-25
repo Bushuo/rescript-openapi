@@ -4,9 +4,9 @@ import {spawnSync} from "node:child_process"
 import {tmpdir} from "node:os"
 import {basename, join, resolve} from "node:path"
 
-function runCli(specPath, targetDir) {
+function runCli(specPath, targetDir, extraArgs = []) {
   const cliPath = resolve("packages/openapi-rescript-cli/bin/openapi-rescript.mjs")
-  const result = spawnSync("node", [cliPath, specPath, targetDir], {
+  const result = spawnSync("node", [cliPath, ...extraArgs, specPath, targetDir], {
     encoding: "utf8",
   })
 
@@ -30,6 +30,43 @@ describe("generateClient", () => {
         expect.arrayContaining(["Client.res", "Index.res", "Models.res", "Pets.res", "Schemas.res"])
       )
       expect(readFileSync(join(targetDir, "Pets.res"), "utf8")).toContain("let listPets =")
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("keeps the default open enum mode past enum decoding", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const openResult = runCli(resolve("fixtures/specs/backend-api.json"), targetDir)
+
+      expect(openResult.exitCode).toBe(1)
+      expect(openResult.stdout).toBe("")
+      expect(openResult.stderr).not.toContain("Usage: openapi-rescript")
+      expect(JSON.parse(openResult.stderr)).toMatchObject({
+        path: expect.any(Array),
+        message: expect.any(String),
+      })
+      expect(JSON.parse(openResult.stderr).message).not.toBe("Unsupported schema construct: enum")
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("accepts closed enum mode as a CLI option", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const closedResult = runCli(resolve("fixtures/specs/backend-api.json"), targetDir, ["--enum-mode=closed"])
+
+      expect(closedResult.exitCode).toBe(1)
+      expect(closedResult.stdout).toBe("")
+      expect(closedResult.stderr).not.toContain("Usage: openapi-rescript")
+      expect(JSON.parse(closedResult.stderr)).toMatchObject({
+        path: expect.any(Array),
+        message: expect.any(String),
+      })
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
     }

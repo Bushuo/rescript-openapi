@@ -57,4 +57,42 @@ describe("openapi-rescript CLI smoke test", () => {
       rmSync(packDir, {recursive: true, force: true})
     }
   })
+
+  it("accepts the packaged closed enum mode flag", () => {
+    const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
+    const file = join(dir, "smoke.yaml")
+    const {packDir, tarball} = packCliPackage()
+
+    writeFileSync(
+      file,
+      [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Smoke API",
+        "  version: 1.0.0",
+        "components:",
+        "  schemas:",
+        "    Pong:",
+        "      type: object",
+        "paths: {}",
+        "",
+      ].join("\n")
+    )
+
+    try {
+      writeFileSync(join(dir, "package.json"), "{}\n")
+      execFileSync("pnpm", ["add", tarball], {cwd: dir, stdio: "pipe"})
+
+      const output = execFileSync("pnpm", ["exec", "openapi-rescript", "--enum-mode=closed", file, dir], {
+        cwd: dir,
+        encoding: "utf8",
+      })
+
+      expect(output).toBe("")
+      expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Client.res", "Index.res", "Models.res", "Schemas.res"]))
+    } finally {
+      rmSync(dir, {recursive: true, force: true})
+      rmSync(packDir, {recursive: true, force: true})
+    }
+  })
 })
