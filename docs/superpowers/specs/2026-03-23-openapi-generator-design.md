@@ -8,7 +8,7 @@ Build an OpenAPI client generator for ReScript that:
 
 - targets OpenAPI 3.1
 - generates one client module per tag
-- uses `rescript-fetch` for HTTP
+- uses `@glennsl/rescript-fetch` for HTTP
 - uses `sury` `v11.0.0-alpha.4` for schema generation, request validation, and response parsing
 - exposes explicit typed errors instead of exception-driven APIs
 
