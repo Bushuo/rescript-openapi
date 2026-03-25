@@ -5,8 +5,12 @@ import {tmpdir} from "node:os"
 import {basename, join, resolve} from "node:path"
 
 function runCli(specPath, targetDir, extraArgs = []) {
+  return runCliArgs([...extraArgs, specPath, targetDir])
+}
+
+function runCliArgs(args) {
   const cliPath = resolve("packages/openapi-rescript-cli/bin/openapi-rescript.mjs")
-  const result = spawnSync("node", [cliPath, ...extraArgs, specPath, targetDir], {
+  const result = spawnSync("node", [cliPath, ...args], {
     encoding: "utf8",
   })
 
@@ -65,6 +69,48 @@ describe("generateClient", () => {
       expect(JSON.parse(closedResult.stderr)).toMatchObject({
         path: expect.any(Array),
         message: "Unsupported schema construct: enum",
+      })
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rejects misplaced enum mode options with a structured diagnostic", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const result = runCliArgs([
+        resolve("fixtures/specs/string-enum-regression.yaml"),
+        "--enum-mode=closed",
+        targetDir,
+      ])
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(JSON.parse(result.stderr)).toEqual({
+        path: [],
+        message: "Unknown option: --enum-mode=closed",
+      })
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rejects invalid enum mode values with a structured diagnostic", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const result = runCliArgs([
+        "--enum-mode=banana",
+        resolve("fixtures/specs/string-enum-regression.yaml"),
+        targetDir,
+      ])
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(JSON.parse(result.stderr)).toEqual({
+        path: [],
+        message: "Invalid enum mode: banana",
       })
     } finally {
       rmSync(targetDir, {recursive: true, force: true})

@@ -10,10 +10,14 @@ const generatorImportPaths = [
 
 let generatorPromise
 
-export async function runCore(entryPath, targetDir = process.cwd(), options = {enumMode: "open"}) {
+export async function runCore(entryPath, targetDir = process.cwd(), options = {enumMode: "open"}, dependencies = {}) {
+  const parseInputFn = dependencies.parseInput ?? parseInput
+  const loadGeneratorFn = dependencies.loadGenerator ?? loadGenerator
+  const syncGeneratedFilesFn = dependencies.syncGeneratedFiles ?? syncGeneratedFiles
+
   try {
-    const normalized = await parseInput(entryPath)
-    const OpenapiGenerator = await loadGenerator()
+    const normalized = await parseInputFn(entryPath)
+    const OpenapiGenerator = await loadGeneratorFn()
     const output = OpenapiGenerator.generate(normalized, options)
 
     if (!output.ok) {
@@ -23,7 +27,7 @@ export async function runCore(entryPath, targetDir = process.cwd(), options = {e
       }
     }
 
-    await syncGeneratedFiles(targetDir, output.files)
+    await syncGeneratedFilesFn(targetDir, output.files)
 
     return {
       ok: true,

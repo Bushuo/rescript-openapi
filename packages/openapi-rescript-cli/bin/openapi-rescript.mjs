@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {runCore} from "../src/runCore.mjs"
+import {parseCliArgs} from "../src/parseCliArgs.mjs"
 
 function structuredDiagnostic(message) {
   return {
@@ -9,37 +10,18 @@ function structuredDiagnostic(message) {
   }
 }
 
-function parseEnumMode(arg) {
-  if (arg === undefined) {
-    return {value: "open", consumed: 0}
-  }
-
-  if (!arg.startsWith("--enum-mode=")) {
-    return {value: "open", consumed: 0}
-  }
-
-  const value = arg.slice("--enum-mode=".length)
-
-  if (value === "open" || value === "closed") {
-    return {value, consumed: 1}
-  }
-
-  throw new Error(`Invalid enum mode: ${value}`)
-}
-
 async function main() {
   const args = process.argv.slice(2)
-  const {value: enumMode, consumed} = parseEnumMode(args[0])
-  const inputPath = args[consumed]
-  const targetDir = args[consumed + 1] ?? process.cwd()
+  const parsed = parseCliArgs(args)
 
-  if (!inputPath) {
-    console.error("Usage: openapi-rescript <spec-file> [output-dir]")
+  if (!parsed.ok) {
+    process.stderr.write(`${JSON.stringify(parsed.diagnostic)}\n`)
     process.exitCode = 1
     return
   }
 
-  const result = await runCore(inputPath, targetDir, {enumMode})
+  const {enumMode, inputPath, targetDir} = parsed
+  const result = await runCore(inputPath, targetDir ?? process.cwd(), {enumMode})
 
   if (result.ok) {
     return
