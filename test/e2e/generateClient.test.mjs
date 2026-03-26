@@ -73,7 +73,7 @@ describe("generateClient", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 
     try {
-      const closedResult = runCli(resolve("fixtures/specs/string-enum-regression.yaml"), targetDir, ["--enum-mode=closed"])
+      const closedResult = runCli(resolve("fixtures/specs/string-enum.yaml"), targetDir, ["--enum-mode=closed"])
 
       expect(closedResult.exitCode).toBe(0)
       expect(closedResult.stdout).toBe("")
@@ -92,7 +92,7 @@ describe("generateClient", () => {
 
     try {
       const result = runCliArgs([
-        resolve("fixtures/specs/string-enum-regression.yaml"),
+        resolve("fixtures/specs/string-enum.yaml"),
         "--enum-mode=closed",
         targetDir,
       ])
@@ -114,7 +114,7 @@ describe("generateClient", () => {
     try {
       const result = runCliArgs([
         "--enum-mode=banana",
-        resolve("fixtures/specs/string-enum-regression.yaml"),
+        resolve("fixtures/specs/string-enum.yaml"),
         targetDir,
       ])
 
@@ -134,7 +134,7 @@ describe("generateClient", () => {
 
     try {
       const result = runCliArgs([
-        resolve("fixtures/specs/string-enum-regression.yaml"),
+        resolve("fixtures/specs/string-enum.yaml"),
         targetDir,
         "--bad",
       ])
