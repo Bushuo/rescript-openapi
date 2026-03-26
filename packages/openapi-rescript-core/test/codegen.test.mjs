@@ -14,6 +14,7 @@ const normalizedEnums = JSON.parse(
 
 const generateWithOptions = (input, options) => generate(input, options)
 const sortFiles = files => [...files].sort((left, right) => left.path.localeCompare(right.path))
+const withoutSchemasFile = files => files.filter(file => file.path !== "Schemas.res")
 
 const readGoldenFiles = fixtureName => {
   let fixtureDir = new URL(`./golden/${fixtureName}/`, import.meta.url)
@@ -95,8 +96,12 @@ describe("codegen", () => {
 
     expect(openOutput.ok).toBe(true)
     expect(closedOutput.ok).toBe(true)
-    expect(sortFiles(openOutput.files)).toEqual(readGoldenFiles("enums-open"))
-    expect(sortFiles(closedOutput.files)).toEqual(readGoldenFiles("enums-closed"))
+    expect(withoutSchemasFile(sortFiles(openOutput.files))).toEqual(
+      withoutSchemasFile(readGoldenFiles("enums-open")),
+    )
+    expect(withoutSchemasFile(sortFiles(closedOutput.files))).toEqual(
+      withoutSchemasFile(readGoldenFiles("enums-closed")),
+    )
     expect(openModels).toContain("| Unknown(string)")
     expect(closedModels).not.toContain("| Unknown(string)")
     expect(openModels.indexOf("type sessionVisibility =")).toBeLessThan(
@@ -114,6 +119,46 @@ describe("codegen", () => {
     )
     expect(openSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
     expect(closedSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
+  })
+
+  it("orders named schema definitions before sibling schemas that reference them", () => {
+    let outOfOrderSchemaFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Out Of Order Schemas API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          Thing: {
+            type: "object",
+            required: ["status"],
+            properties: {
+              status: {$ref: "#/components/schemas/Status"},
+            },
+          },
+          Status: {
+            type: "string",
+            enum: ["draft", "published"],
+          },
+        },
+      },
+      paths: {},
+    }
+
+    let openOutput = generateWithOptions(outOfOrderSchemaFixture, {enumMode: "open"})
+    let closedOutput = generateWithOptions(outOfOrderSchemaFixture, {enumMode: "closed"})
+    let openSchemas = generatedFile(openOutput, "Schemas.res")
+    let closedSchemas = generatedFile(closedOutput, "Schemas.res")
+
+    expect(openOutput.ok).toBe(true)
+    expect(closedOutput.ok).toBe(true)
+    expect(openSchemas.indexOf("let status: t<Models.status> = stringMapped(")).toBeLessThan(
+      openSchemas.indexOf("let thing: t<Models.thing> = object_(["),
+    )
+    expect(closedSchemas.indexOf("let status: t<Models.status> = stringMapped(")).toBeLessThan(
+      closedSchemas.indexOf("let thing: t<Models.thing> = object_(["),
+    )
   })
 
   it("rejects open enums when a declared value normalizes to the reserved Unknown constructor", () => {

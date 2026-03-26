@@ -54,4 +54,22 @@ describe("parseCliArgs", () => {
       },
     })
   })
+
+  it("includes the enum mode flag in usage diagnostics", () => {
+    expect(parseCliArgs([])).toEqual({
+      ok: false,
+      diagnostic: {
+        path: [],
+        message: "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]",
+      },
+    })
+
+    expect(parseCliArgs(["fixtures/spec.yaml", "out", "extra"])).toEqual({
+      ok: false,
+      diagnostic: {
+        path: [],
+        message: "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]",
+      },
+    })
+  })
 })

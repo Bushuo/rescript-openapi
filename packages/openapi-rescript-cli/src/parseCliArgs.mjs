@@ -5,6 +5,8 @@ function structuredDiagnostic(message) {
   }
 }
 
+const usageMessage = "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]"
+
 function parseEnumModeArg(arg) {
   if (!arg.startsWith("--enum-mode=")) {
     return {
@@ -50,7 +52,7 @@ export function parseCliArgs(args) {
   if (!inputPath) {
     return {
       ok: false,
-      diagnostic: structuredDiagnostic("Usage: openapi-rescript <spec-file> [output-dir]"),
+      diagnostic: structuredDiagnostic(usageMessage),
     }
   }
 
@@ -82,7 +84,7 @@ export function parseCliArgs(args) {
   if (extraArg !== undefined) {
     return {
       ok: false,
-      diagnostic: structuredDiagnostic("Usage: openapi-rescript <spec-file> [output-dir]"),
+      diagnostic: structuredDiagnostic(usageMessage),
     }
   }
 
