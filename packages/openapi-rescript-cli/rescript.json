@@ -4,9 +4,11 @@
     {
       "dir": "src",
       "subdirs": true
+    },
+    {
+      "dir": "bin",
+      "subdirs": true
     }
   ],
-  "dependencies": [
-    "openapi-rescript-core"
-  ]
+  "dependencies": ["openapi-rescript-core"]
 }
