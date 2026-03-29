@@ -6,11 +6,6 @@
       "subdirs": true
     }
   ],
-  "package-specs": {
-    "module": "commonjs",
-    "in-source": true
-  },
-  "suffix": ".bs.js",
   "dependencies": [
     "@glennsl/rescript-fetch",
     "sury"

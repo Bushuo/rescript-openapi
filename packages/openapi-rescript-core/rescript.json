@@ -6,10 +6,5 @@
       "subdirs": true
     }
   ],
-  "package-specs": {
-    "module": "commonjs",
-    "in-source": false
-  },
-  "suffix": ".bs.js",
   "dependencies": []
 }

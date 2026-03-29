@@ -8,6 +8,18 @@ importers:
 
   .:
     devDependencies:
+      openapi-rescript-cli:
+        specifier: workspace:*
+        version: link:packages/openapi-rescript-cli
+      openapi-rescript-core:
+        specifier: workspace:*
+        version: link:packages/openapi-rescript-core
+      openapi-rescript-runtime:
+        specifier: workspace:*
+        version: link:packages/openapi-rescript-runtime
+      rescript:
+        specifier: ^12.2.0
+        version: 12.2.0
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(yaml@2.8.3)
@@ -26,10 +38,6 @@ importers:
       '@rescript/runtime':
         specifier: ^12.2.0
         version: 12.2.0
-    devDependencies:
-      rescript:
-        specifier: ^12.2.0
-        version: 12.2.0
 
   packages/openapi-rescript-runtime:
     dependencies:
@@ -42,10 +50,6 @@ importers:
       sury:
         specifier: 11.0.0-alpha.4
         version: 11.0.0-alpha.4(rescript@12.2.0)
-    devDependencies:
-      rescript:
-        specifier: ^12.2.0
-        version: 12.2.0
 
 packages:
 

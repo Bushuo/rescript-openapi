@@ -2,8 +2,8 @@ import {beforeEach, describe, expect, it, vi} from "vitest"
 
 const loadRuntime = async () => {
   let [Client, Schema, S] = await Promise.all([
-    import("../lib/bs/src/Client.bs.js"),
-    import("../lib/bs/src/Schema.bs.js"),
+    import("../src/Client.bs.js"),
+    import("../src/Schema.bs.js"),
     import("../node_modules/sury/src/S.bs.js"),
   ])
 

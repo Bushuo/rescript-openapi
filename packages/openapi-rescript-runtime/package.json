@@ -3,16 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "build": "pnpm exec rescript build",
-    "test": "pnpm run build && cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-runtime/test/runtime.test.mjs",
+    "test": "pnpm --dir ../.. exec rescript build packages/openapi-rescript-runtime && cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-runtime/test/runtime.test.mjs",
     "check": "pnpm run test"
   },
   "dependencies": {
     "@glennsl/rescript-fetch": "0.2.3",
     "@rescript/runtime": "^12.2.0",
     "sury": "11.0.0-alpha.4"
-  },
-  "devDependencies": {
-    "rescript": "^12.2.0"
   }
 }

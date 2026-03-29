@@ -4,7 +4,7 @@ import {tmpdir} from "node:os"
 import {join} from "node:path"
 import {fileURLToPath} from "node:url"
 import {describe, expect, it} from "vitest"
-import {generate} from "../lib/js/src/OpenapiGenerator.bs.js"
+import {generate} from "../src/OpenapiGenerator.bs.js"
 
 const minimalFixture = JSON.parse(
   readFileSync(new URL("./fixtures/minimal.json", import.meta.url), "utf8"),
@@ -82,12 +82,12 @@ describe("generate", () => {
 
   it("loads the built entrypoint under plain Node package resolution", () => {
     let sandboxDir = mkdtempSync(join(tmpdir(), "openapi-rescript-core-"))
-    cpSync(new URL("../lib", import.meta.url), join(sandboxDir, "lib"), {recursive: true})
+    cpSync(new URL("../src", import.meta.url), join(sandboxDir, "src"), {recursive: true})
     cpSync(join(packageDir, "node_modules"), join(sandboxDir, "node_modules"), {recursive: true})
 
     let output = execFileSync(
       "node",
-      ["-e", "require('./lib/js/src/OpenapiGenerator.bs.js'); process.stdout.write('loaded')"],
+      ["-e", "require('./src/OpenapiGenerator.bs.js'); process.stdout.write('loaded')"],
       {
         cwd: sandboxDir,
         encoding: "utf8",

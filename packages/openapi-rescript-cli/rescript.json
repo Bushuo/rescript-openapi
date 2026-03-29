@@ -1,0 +1,12 @@
+{
+  "name": "openapi-rescript-cli",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    }
+  ],
+  "dependencies": [
+    "openapi-rescript-core"
+  ]
+}

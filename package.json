@@ -1,12 +1,17 @@
 {
+  "name": "rescript-openapi",
   "private": true,
   "packageManager": "pnpm",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm exec rescript build",
     "test": "pnpm build && vitest run --passWithNoTests",
     "check": "pnpm -r check"
   },
   "devDependencies": {
+    "openapi-rescript-cli": "workspace:*",
+    "openapi-rescript-core": "workspace:*",
+    "openapi-rescript-runtime": "workspace:*",
+    "rescript": "^12.2.0",
     "vitest": "^3.2.4"
   }
 }

@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs"
 import {describe, expect, it} from "vitest"
-import {generate} from "../lib/js/src/OpenapiGenerator.bs.js"
+import {generate} from "../src/OpenapiGenerator.bs.js"
 
 const normalizedPetstore = JSON.parse(
   readFileSync(new URL("./fixtures/petstore.normalized.json", import.meta.url), "utf8"),

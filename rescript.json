@@ -1,0 +1,13 @@
+{
+  "name": "rescript-openapi",
+  "dependencies": [
+    "openapi-rescript-core",
+    "openapi-rescript-runtime",
+    "openapi-rescript-cli"
+  ],
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": true
+  },
+  "suffix": ".bs.js"
+}

@@ -4,8 +4,8 @@ import {parseInput} from "./parseInput.mjs"
 
 const manifestName = ".openapi-rescript-generated.json"
 const generatorImportPaths = [
-  "../vendor/openapi-rescript-core/lib/js/src/OpenapiGenerator.bs.js",
-  "../../openapi-rescript-core/lib/js/src/OpenapiGenerator.bs.js",
+  "../vendor/openapi-rescript-core/src/OpenapiGenerator.bs.js",
+  "../../openapi-rescript-core/src/OpenapiGenerator.bs.js",
 ]
 
 let generatorPromise
