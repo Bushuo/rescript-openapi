@@ -2,7 +2,7 @@ import {describe, expect, it} from "vitest"
 import {mkdtempSync, rmSync, writeFileSync} from "node:fs"
 import {tmpdir} from "node:os"
 import {join, resolve} from "node:path"
-import {resolveRefs} from "../src/resolveRefs.mjs"
+import {resolveRefs} from "../src/ResolveRefs.bs.js"
 
 describe("resolveRefs", () => {
   it("resolves local file refs", async () => {
