@@ -1,7 +1,7 @@
 let normalizeOpenApi = (document: JSON.t) => {
   let document = switch document {
   | JSON.Object(x) => x
-  | _ => JsError.make("OpenAPI document must be a plain object")->JsError.throw
+  | _ => JsError.throwWithMessage("OpenAPI document must be a plain object")
   }
 
   let document = Utils.toObj(document)
@@ -10,7 +10,7 @@ let normalizeOpenApi = (document: JSON.t) => {
   let paths = document["paths"]
 
   if typeof(openapi) != #string || !(/^3\.1\.\d+$/->RegExp.test(openapi)) {
-    JsError.make("Only OpenAPI 3.1.x documents are supported")->JsError.throw
+    JsError.throwWithMessage("Only OpenAPI 3.1.x documents are supported")
   }
 
   if (
@@ -18,11 +18,11 @@ let normalizeOpenApi = (document: JSON.t) => {
     typeof(info["title"]) != #string ||
     typeof(info["version"]) != #string
   ) {
-    JsError.make("OpenAPI document is missing required info metadata")->JsError.throw
+    JsError.throwWithMessage("OpenAPI document is missing required info metadata")
   }
 
   if !Utils.isPlainObject(paths) {
-    JsError.make("OpenAPI document must include a paths object")->JsError.throw
+    JsError.throwWithMessage("OpenAPI document must include a paths object")
   }
 
   document
