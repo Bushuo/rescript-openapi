@@ -4,4 +4,4 @@ let isPlainObject = value =>
   | _ => false
   }
 
-external toObj: Type.Classify.object => 'a = "%identity"
+external toObj: dict<JSON.t> => 'a = "%identity"

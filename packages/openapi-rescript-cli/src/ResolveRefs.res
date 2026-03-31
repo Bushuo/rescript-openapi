@@ -147,8 +147,7 @@ let resolveRefs = async entryPath => {
   let absolutePath = Node.Path.resolve([entryPath])
   let cache = Map.make()
   let document = await Document.read(absolutePath)
-  let ancestry = Set.make()
-  ancestry->Set.add(absolutePath)
+  let ancestry = Set.fromArray([absolutePath])
 
-  resolveNode(document, absolutePath, cache, ancestry)
+  await resolveNode(document, absolutePath, cache, ancestry)
 }

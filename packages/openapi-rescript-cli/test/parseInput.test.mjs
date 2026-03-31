@@ -2,7 +2,7 @@ import {describe, expect, it} from "vitest"
 import {mkdtempSync, rmSync, writeFileSync} from "node:fs"
 import {tmpdir} from "node:os"
 import {join, resolve} from "node:path"
-import {parseInput} from "../src/parseInput.mjs"
+import {parseInput} from "../src/ParseInput.bs.js"
 
 describe("parseInput", () => {
   it("parses YAML input into a plain JS object", async () => {

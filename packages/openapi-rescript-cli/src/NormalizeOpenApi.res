@@ -1,6 +1,6 @@
-let normalizeOpenApi = (document: unknown) => {
-  let document = switch Type.Classify.classify(document) {
-  | Object(x) if !Array.isArray(x) => x
+let normalizeOpenApi = (document: JSON.t) => {
+  let document = switch document {
+  | JSON.Object(x) => x
   | _ => JsError.make("OpenAPI document must be a plain object")->JsError.throw
   }
 
