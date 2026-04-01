@@ -1,3 +1,8 @@
+// exposed types
+type diagnostic = Diagnostics.diagnostic
+type enumMode = Ir.enumMode
+type file = Printer.file
+
 type output = {
   ok: bool,
   value: option<Ir.document>,
@@ -6,7 +11,7 @@ type output = {
 }
 
 type options = {
-  enumMode: Ir.enumMode,
+  enumMode: enumMode,
 }
 
 let success = (value: Ir.document, files: array<Printer.file>): output => {
@@ -25,17 +30,24 @@ let failure = (error: Diagnostics.diagnostic): output => {
 
 let decodeDocument = OpenapiDecode.decodeDocument
 
-let defaultOptions: options = {enumMode: Ir.Open}
+let defaultOptions: options = {enumMode: Open}
 
-let validateCodegenOptions = (document: Ir.document, options: options): result<unit, Diagnostics.diagnostic> => {
+let validateCodegenOptions = (document: Ir.document, options: options): result<
+  unit,
+  Diagnostics.diagnostic,
+> => {
   let error = ref(None)
 
-  if options.enumMode == Ir.Open {
+  if options.enumMode == Open {
     Array.forEach(document.schemas, schema =>
       switch (error.contents, schema.schema) {
       | (Some(_), _) => ()
       | (None, Ir.StringEnum({values, path, _})) =>
-        switch Naming.validateReservedEnumConstructor(~path, ~reservedConstructorName="Unknown", values) {
+        switch Naming.validateReservedEnumConstructor(
+          ~path,
+          ~reservedConstructorName="Unknown",
+          values,
+        ) {
         | Ok() => ()
         | Error(problem) => error.contents = Some(problem)
         }
@@ -60,7 +72,9 @@ let emitFiles = (document: Ir.document, options: options): array<Printer.file> =
   Belt.Array.concatMany([[clientFile, indexFile, modelsFile], tagFiles, [schemasFile]])
 }
 
-let generate = (input: JSON.t, ~options: options=defaultOptions): output =>
+type generator = (JSON.t, ~options: options=?) => output
+
+let generate: generator = (input, ~options=defaultOptions) =>
   switch decodeDocument(input) {
   | Ok(document) =>
     switch validateCodegenOptions(document, options) {

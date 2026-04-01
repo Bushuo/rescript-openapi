@@ -10,12 +10,8 @@ let structuredDiagnostic = message => {
   message,
 }
 
-module Flags = {
-  type enumMode = Open | Closed
-
-  type t = {
-    enumMode: enumMode,
-  }
+module Options = {
+  type t = OpenapiGenerator.options
 
   let parseEnumModeArg = arg => {
     let enumModePattern = "--enum-mode="
@@ -25,18 +21,15 @@ module Flags = {
       let value = arg->String.slice(~start=String.length(enumModePattern))
 
       switch value {
-      | "open" => Ok(Open)
+      | "open" => Ok((Open: OpenapiGenerator.enumMode))
       | "closed" => Ok(Closed)
       | _ => Error(structuredDiagnostic(`Invalid enum mode: ${value}`))
       }
     }
   }
 
-  let parseFlags = (args: array<string>) => {
+  let parse = (args: array<string>): result<(array<string>, t), diagnostic> => {
     let arg = args->Array.getUnsafe(0)
-    let defaultFlags = {
-      enumMode: Open,
-    }
 
     if arg->String.startsWith("--") {
       let newArgs = args->Array.slice(~start=1)
@@ -49,13 +42,13 @@ module Flags = {
         },
       )
     } else {
-      Ok(args, defaultFlags)
+      Ok(args, OpenapiGenerator.defaultOptions)
     }
   }
 }
 
 type cliArgs = {
-  flags: Flags.t,
+  options: Options.t,
   inputPath: string,
   targetDir: string,
 }
@@ -90,7 +83,7 @@ let parseArgs = (args: array<string>): result<cliArgs, diagnostic> => {
   if Array.length(args) == 0 {
     Error(structuredDiagnostic(usageMessage))
   } else {
-    let? Ok((args, flags)) = Flags.parseFlags(args)
+    let? Ok((args, options)) = Options.parse(args)
 
     let? Ok(args, inputPath) = parseInputPath(args)
 
@@ -105,7 +98,7 @@ let parseArgs = (args: array<string>): result<cliArgs, diagnostic> => {
       }
     } else {
       Ok({
-        flags,
+        options,
         inputPath,
         targetDir,
       })

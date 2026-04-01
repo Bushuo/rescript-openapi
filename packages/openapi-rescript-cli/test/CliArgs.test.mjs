@@ -19,8 +19,8 @@ describe("parseArgs", () => {
   it("accepts the supported CLI forms", () => {
     expect(parseArgs(["fixtures/spec.yaml"])).toEqual(
       ok({
-        flags: {
-          enumMode: "Open",
+        options: {
+          enumMode: "open",
         },
         inputPath: "fixtures/spec.yaml",
         targetDir: process.cwd(),
@@ -31,8 +31,8 @@ describe("parseArgs", () => {
       parseArgs(["--enum-mode=open", "fixtures/spec.yaml", "out"]),
     ).toEqual(
       ok({
-        flags: {
-          enumMode: "Open",
+        options: {
+          enumMode: "open",
         },
         inputPath: "fixtures/spec.yaml",
         targetDir: "out",
@@ -41,8 +41,8 @@ describe("parseArgs", () => {
 
     expect(parseArgs(["--enum-mode=closed", "fixtures/spec.yaml"])).toEqual(
       ok({
-        flags: {
-          enumMode: "Closed",
+        options: {
+          enumMode: "closed",
         },
         inputPath: "fixtures/spec.yaml",
         targetDir: process.cwd(),
