@@ -1,7 +1,7 @@
 {
   "name": "rescript-openapi",
   "private": true,
-  "packageManager": "pnpm",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "pnpm exec rescript build",
     "test": "pnpm build && vitest run --passWithNoTests",
