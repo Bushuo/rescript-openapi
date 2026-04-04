@@ -777,20 +777,17 @@ let decodeSecuritySchemes = (~path: array<string>, root: dict<JSON.t>): result<
   }
 
 let decodeTags = (~path: array<string>, root: dict<JSON.t>): result<array<string>> =>
-  switch Dict.get(root, "tags") {
-  | None => Ok([])
-  | Some(tagsJson) =>
-    switch JSON.Decode.array(tagsJson) {
-    | None => Error(Diagnostics.make(~path=at(path, "tags"), ~message="Expected array"))
-    | Some(tagsArray) =>
-      collectArray(tagsArray, (tagJson, index) => {
-        let tagPath = at(at(path, "tags"), Int.toString(index))
-        switch JSON.Decode.object(tagJson) {
-        | None => Error(Diagnostics.make(~path=tagPath, ~message="Expected object"))
-        | Some(tagObject) => JsonDecode.stringField(~path=tagPath, tagObject, "name")
-        }
-      })
-    }
+  switch root {
+  | dict{"tags": JSON.Array(tagsArray)} =>
+    tagsArray->collectArray((tagJson, index) => {
+      let tagPath = path->at("tags")->at(Int.toString(index))
+      switch JSON.Decode.object(tagJson) {
+      | None => Error(Diagnostics.make(~path=tagPath, ~message="Expected object"))
+      | Some(tagObject) => JsonDecode.stringField(~path=tagPath, tagObject, "name")
+      }
+    })
+  | dict{"tags": _} => Error(Diagnostics.make(~path=at(path, "tags"), ~message="Expected array"))
+  | _ => Ok([])
   }
 
 let decodeDocument = (input: JSON.t): result<Ir.document> => {
