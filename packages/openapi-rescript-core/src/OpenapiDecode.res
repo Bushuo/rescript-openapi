@@ -290,99 +290,99 @@ let decodeSecurityRequirements = (~path: array<string>, source: dict<JSON.t>, na
     }
   }
 
+let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<
+  array<Ir.securityRequirement>,
+> =>
+  switch decodeSecurityRequirements(~path, root, "security") {
+  | Ok(Some(security)) => Ok(security)
+  | Ok(None) => Ok([])
+  | Error(problem) => Error(problem)
+  }
+
 let decodeOperation = (
   ~routePath: string,
   ~method_: string,
   ~operationPath: array<string>,
   ~inheritedParameters: array<Ir.parameter>,
   operationJson: JSON.t,
-): result<Ir.operation> =>
-  switch JSON.Decode.object(operationJson) {
+): result<Ir.operation> => {
+  let operationObjectResult = switch JSON.Decode.object(operationJson) {
+  | Some(operationObject) => Ok(operationObject)
   | None => Error(Diagnostics.make(~path=operationPath, ~message="Expected object"))
-  | Some(operationObject) =>
-    switch (
-      optionalStringField(~path=operationPath, operationObject, "operationId"),
-      optionalStringArrayField(~path=operationPath, operationObject, "tags"),
-      decodeParameters(~path=operationPath, operationObject),
-      decodeRequestBody(~path=operationPath, operationObject),
-      decodeResponses(~path=operationPath, operationObject),
-      decodeSecurityRequirements(~path=operationPath, operationObject, "security"),
-    ) {
-    | (Ok(operationId), Ok(tags), Ok(parameters), Ok(requestBody), Ok(responses), Ok(security)) =>
-      let operation: Ir.operation = {
-        operationId,
-        name: "",
-        method: method_,
-        path: routePath,
-        tags,
-        parameters: mergeParameters(inheritedParameters, parameters),
-        requestBody,
-        responses,
-        security,
-      }
-      Ok(operation)
-    | (Error(problem), _, _, _, _, _) => Error(problem)
-    | (_, Error(problem), _, _, _, _) => Error(problem)
-    | (_, _, Error(problem), _, _, _) => Error(problem)
-    | (_, _, _, Error(problem), _, _) => Error(problem)
-    | (_, _, _, _, Error(problem), _) => Error(problem)
-    | (_, _, _, _, _, Error(problem)) => Error(problem)
-    }
   }
+
+  let? Ok(operationObject) = operationObjectResult
+  let? Ok(operationId) = optionalStringField(~path=operationPath, operationObject, "operationId")
+  let? Ok(tags) = optionalStringArrayField(~path=operationPath, operationObject, "tags")
+  let? Ok(parameters) = decodeParameters(~path=operationPath, operationObject)
+  let? Ok(requestBody) = decodeRequestBody(~path=operationPath, operationObject)
+  let? Ok(responses) = decodeResponses(~path=operationPath, operationObject)
+  let? Ok(security) = decodeSecurityRequirements(~path=operationPath, operationObject, "security")
+
+  let operation: Ir.operation = {
+    operationId,
+    name: "",
+    method: method_,
+    path: routePath,
+    tags,
+    parameters: mergeParameters(inheritedParameters, parameters),
+    requestBody,
+    responses,
+    security,
+  }
+  Ok(operation)
+}
 
 let operationMethods = ["get", "post", "put", "patch", "delete", "options", "head", "trace"]
 
-let decodeOperations = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.operation>> =>
-  switch JsonDecode.objectField(~path, root, "paths") {
-  | Error(problem) => Error(problem)
-  | Ok(pathsObject) =>
-    let operations = ref([])
-    let error = ref(None)
+let decodeOperations = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.operation>> => {
+  let? Ok(pathsObject) = JsonDecode.objectField(~path, root, "paths")
+  let operations = ref([])
+  let error = ref(None)
 
-    Dict.forEachWithKey(pathsObject, (pathJson, routePath) =>
-      switch error.contents {
-      | Some(_) => ()
+  Dict.forEachWithKey(pathsObject, (pathJson, routePath) =>
+    switch error.contents {
+    | Some(_) => ()
+    | None =>
+      switch JSON.Decode.object(pathJson) {
       | None =>
-        switch JSON.Decode.object(pathJson) {
-        | None =>
-          error.contents = Some(
-            Diagnostics.make(~path=["paths", routePath], ~message="Expected object"),
-          )
-        | Some(pathObject) =>
-          switch decodeParameters(~path=["paths", routePath], pathObject) {
-          | Error(problem) => error.contents = Some(problem)
-          | Ok(inheritedParameters) =>
-            Array.forEach(operationMethods, method_ =>
-              switch error.contents {
-              | Some(_) => ()
-              | None =>
-                switch Dict.get(pathObject, method_) {
-                | None => ()
-                | Some(operationJson) =>
-                  switch decodeOperation(
-                    ~routePath,
-                    ~method_,
-                    ~operationPath=["paths", routePath, method_],
-                    ~inheritedParameters,
-                    operationJson,
-                  ) {
-                  | Ok(operation) =>
-                    operations.contents = Belt.Array.concat(operations.contents, [operation])
-                  | Error(problem) => error.contents = Some(problem)
-                  }
+        error.contents = Some(
+          Diagnostics.make(~path=["paths", routePath], ~message="Expected object"),
+        )
+      | Some(pathObject) =>
+        switch decodeParameters(~path=["paths", routePath], pathObject) {
+        | Error(problem) => error := Some(problem)
+        | Ok(inheritedParameters) =>
+          Array.forEach(operationMethods, method_ =>
+            switch error.contents {
+            | Some(_) => ()
+            | None =>
+              switch Dict.get(pathObject, method_) {
+              | None => ()
+              | Some(operationJson) =>
+                switch decodeOperation(
+                  ~routePath,
+                  ~method_,
+                  ~operationPath=["paths", routePath, method_],
+                  ~inheritedParameters,
+                  operationJson,
+                ) {
+                | Ok(operation) => operations := Belt.Array.concat(operations.contents, [operation])
+                | Error(problem) => error := Some(problem)
                 }
               }
-            )
-          }
+            }
+          )
         }
       }
-    )
-
-    switch error.contents {
-    | Some(problem) => Error(problem)
-    | None => Ok(operations.contents)
     }
+  )
+
+  switch error.contents {
+  | Some(problem) => Error(problem)
+  | None => Ok(operations.contents)
   }
+}
 
 let decodeSchemas = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.namedSchema>> =>
   switch Dict.get(root, "components") {
@@ -408,8 +408,8 @@ let decodeSchemas = (~path: array<string>, root: dict<JSON.t>): result<array<Ir.
               switch SchemaDecode.decode(~path=["components", "schemas", name], schemaJson) {
               | Ok(schema) =>
                 let namedSchema: Ir.namedSchema = {name, schema}
-                decodedSchemas.contents = Belt.Array.concat(decodedSchemas.contents, [namedSchema])
-              | Error(problem) => error.contents = Some(problem)
+                decodedSchemas := Belt.Array.concat(decodedSchemas.contents, [namedSchema])
+              | Error(problem) => error := Some(problem)
               }
             }
           )
@@ -434,17 +434,21 @@ let addLiftedEnum = (
   ~liftedSchemas: ref<array<Ir.namedSchema>>,
   ~name: string,
   ~values: array<string>,
-): result<Ir.schema> =>
-  switch Naming.ensureUniqueEnumTypeName(~path, ~existingNames=reservedNames.contents, name) {
-  | Error(problem) => Error(problem)
-  | Ok() =>
-    reservedNames.contents = Belt.Array.concat(reservedNames.contents, [name])
-    liftedSchemas.contents = Belt.Array.concat(liftedSchemas.contents, [{
-      name,
-      schema: Ir.StringEnum({name, values, path: at(path, "enum")}),
-    }])
-    Ok(Ir.NamedRef(enumRef(name)))
-  }
+): result<Ir.schema> => {
+  let? Ok() = Naming.ensureUniqueEnumTypeName(~path, ~existingNames=reservedNames.contents, name)
+  reservedNames := Belt.Array.concat(reservedNames.contents, [name])
+  liftedSchemas :=
+    Belt.Array.concat(
+      liftedSchemas.contents,
+      [
+        {
+          name,
+          schema: Ir.StringEnum({name, values, path: at(path, "enum")}),
+        },
+      ],
+    )
+  Ok(Ir.NamedRef(enumRef(name)))
+}
 
 let rec liftEnumSchema = (
   ~path: array<string>,
@@ -589,7 +593,14 @@ let liftParameterEnums = (
 ): result<array<Ir.parameter>> =>
   collectArray(operation.parameters, (parameter, index) =>
     switch liftEnumSchema(
-      ~path=["paths", operation.path, operation.method, "parameters", Int.toString(index), "schema"],
+      ~path=[
+        "paths",
+        operation.path,
+        operation.method,
+        "parameters",
+        Int.toString(index),
+        "schema",
+      ],
       ~scope=Naming.Parameter(operation.name, parameter.name),
       ~segments=[],
       ~reservedNames,
@@ -605,25 +616,19 @@ let liftOperationEnums = (
   operation: Ir.operation,
   ~reservedNames: ref<array<string>>,
   ~liftedSchemas: ref<array<Ir.namedSchema>>,
-): result<Ir.operation> =>
-  switch (
-    liftParameterEnums(operation, ~reservedNames, ~liftedSchemas),
-    switch operation.requestBody {
-    | None => Ok(None)
-    | Some(requestBody) =>
-      switch liftRequestBodyEnums(operation, requestBody, ~reservedNames, ~liftedSchemas) {
-      | Ok(nextBody) => Ok(Some(nextBody))
-      | Error(problem) => Error(problem)
-      }
-    },
-    liftResponseEnums(operation, ~reservedNames, ~liftedSchemas),
-  ) {
-  | (Ok(parameters), Ok(requestBody), Ok(responses)) =>
-    Ok({...operation, parameters, requestBody, responses})
-  | (Error(problem), _, _) => Error(problem)
-  | (_, Error(problem), _) => Error(problem)
-  | (_, _, Error(problem)) => Error(problem)
+): result<Ir.operation> => {
+  let? Ok(parameters) = liftParameterEnums(operation, ~reservedNames, ~liftedSchemas)
+  let? Ok(requestBody) = switch operation.requestBody {
+  | None => Ok(None)
+  | Some(requestBody) =>
+    switch liftRequestBodyEnums(operation, requestBody, ~reservedNames, ~liftedSchemas) {
+    | Ok(nextBody) => Ok(Some(nextBody))
+    | Error(problem) => Error(problem)
+    }
   }
+  let? Ok(responses) = liftResponseEnums(operation, ~reservedNames, ~liftedSchemas)
+  Ok({...operation, parameters, requestBody, responses})
+}
 
 let liftReachableEnums = (
   ~operations: array<Ir.operation>,
@@ -788,76 +793,38 @@ let decodeTags = (~path: array<string>, root: dict<JSON.t>): result<array<string
     }
   }
 
-let decodeTopLevelSecurity = (~path: array<string>, root: dict<JSON.t>): result<
-  array<Ir.securityRequirement>,
-> =>
-  switch decodeSecurityRequirements(~path, root, "security") {
-  | Ok(Some(security)) => Ok(security)
-  | Ok(None) => Ok([])
-  | Error(problem) => Error(problem)
-  }
+let decodeDocument = (input: JSON.t): result<Ir.document> => {
+  let? Ok(root) =
+    JsonDecode.object(~path=[], input)->Result.mapError(_ =>
+      Diagnostics.root("Unsupported OpenAPI input")
+    )
 
-let decodeDocument = (input: JSON.t): result<Ir.document> =>
-  switch JsonDecode.object(~path=[], input) {
-  | Error(_) => Error(Diagnostics.root("Unsupported OpenAPI input"))
-  | Ok(root) =>
-    switch (
-      JsonDecode.stringField(~path=[], root, "openapi"),
-      JsonDecode.objectField(~path=[], root, "info"),
-      decodeTags(~path=[], root),
-      decodeTopLevelSecurity(~path=[], root),
-      decodeOperations(~path=[], root),
-      decodeSchemas(~path=[], root),
-      decodeSecuritySchemes(~path=[], root),
-    ) {
-    | (
-        Ok(openapiVersion),
-        Ok(info),
-        Ok(tags),
-        Ok(security),
-        Ok(operations),
-        Ok(schemas),
-        Ok(securitySchemes),
-      ) =>
-      if !String.startsWith(openapiVersion, "3.1.") {
-        Error(
-          Diagnostics.make(~path=["openapi"], ~message="Only OpenAPI 3.1 documents are supported"),
-        )
-      } else {
-        switch (
-          JsonDecode.stringField(~path=["info"], info, "title"),
-          JsonDecode.stringField(~path=["info"], info, "version"),
-        ) {
-        | (Ok(title), Ok(version)) =>
-          switch Naming.normalizeOperations(operations) {
-          | Error(problem) => Error(problem)
-          | Ok(operations) =>
-            switch liftReachableEnums(~operations, ~schemas) {
-            | Error(problem) => Error(problem)
-            | Ok((operations, schemas)) =>
-              let document: Ir.document = {
-                openapiVersion,
-                title,
-                version,
-                tags,
-                security,
-                operations,
-                schemas,
-                securitySchemes,
-              }
-              Ok(document)
-            }
-          }
-        | (Error(problem), _) => Error(problem)
-        | (_, Error(problem)) => Error(problem)
-        }
-      }
-    | (Error(problem), _, _, _, _, _, _) => Error(problem)
-    | (_, Error(problem), _, _, _, _, _) => Error(problem)
-    | (_, _, Error(problem), _, _, _, _) => Error(problem)
-    | (_, _, _, Error(problem), _, _, _) => Error(problem)
-    | (_, _, _, _, Error(problem), _, _) => Error(problem)
-    | (_, _, _, _, _, Error(problem), _) => Error(problem)
-    | (_, _, _, _, _, _, Error(problem)) => Error(problem)
+  let? Ok(openapiVersion) = JsonDecode.stringField(~path=[], root, "openapi")
+  let? Ok(info) = JsonDecode.objectField(~path=[], root, "info")
+  let? Ok(tags) = decodeTags(~path=[], root)
+  let? Ok(security) = decodeTopLevelSecurity(~path=[], root)
+  let? Ok(operations) = decodeOperations(~path=[], root)
+  let? Ok(schemas) = decodeSchemas(~path=[], root)
+  let? Ok(securitySchemes) = decodeSecuritySchemes(~path=[], root)
+
+  if !String.startsWith(openapiVersion, "3.1.") {
+    Error(Diagnostics.make(~path=["openapi"], ~message="Only OpenAPI 3.1 documents are supported"))
+  } else {
+    let? Ok(title) = JsonDecode.stringField(~path=["info"], info, "title")
+    let? Ok(version) = JsonDecode.stringField(~path=["info"], info, "version")
+    let? Ok(operations) = Naming.normalizeOperations(operations)
+    let? Ok((operations, schemas)) = liftReachableEnums(~operations, ~schemas)
+
+    let document: Ir.document = {
+      openapiVersion,
+      title,
+      version,
+      tags,
+      security,
+      operations,
+      schemas,
+      securitySchemes,
     }
+    Ok(document)
   }
+}
