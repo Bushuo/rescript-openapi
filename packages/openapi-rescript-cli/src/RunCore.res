@@ -46,7 +46,7 @@ let isSafeGeneratedPath = (targetDir, generatedPath) => {
     if String.isEmpty(relativePath) {
       false
     } else {
-      !(relativePath->String.startsWith("..")) && !(Node.Path.isAbsolute(relativePath))
+      !(relativePath->String.startsWith("..")) && !Node.Path.isAbsolute(relativePath)
     }
   }
 }
