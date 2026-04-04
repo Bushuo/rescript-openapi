@@ -95,7 +95,7 @@ let rec resolveReference = async (ref, currentFilePath, cache, ancestry): JSON.t
         targetValue,
         targetFilePath,
         cache,
-        Set.fromArray([...ancestry->Set.toArray, targetKey]),
+        Set.fromArray([...Set.toArray(ancestry), targetKey]),
       )
       cache->Map.set(targetKey, resolvedNode)
       resolvedNode
@@ -105,30 +105,32 @@ let rec resolveReference = async (ref, currentFilePath, cache, ancestry): JSON.t
 and resolveNode = async (value: JSON.t, currentFilePath, cache, ancestry): JSON.t => {
   switch value {
   | Array(arr) =>
-    JSON.Array(
+    Array(
       await Promise.all(
         arr->Array.map(async item => await resolveNode(item, currentFilePath, cache, ancestry)),
       ),
     )
   | Object(obj) =>
     switch obj->Dict.get("$ref") {
-    | Some(JSON.String(ref)) => {
+    | Some(String(ref)) => {
         // replace $ref with the resolved value
         obj->Dict.delete("$ref")
         let resolved = await resolveReference(ref, currentFilePath, cache, ancestry)
 
         switch resolved {
-        | JSON.Object(resolved) =>
-          JSON.Object(Dict.fromArray([...resolved->Dict.toArray, ...obj->Dict.toArray]))
-        | resolved =>
-          if Dict.size(obj) > 0 {
-            JSON.Object(Dict.fromArray([...obj->Dict.toArray, ("value", resolved)]))
-          } else {
-            resolved
+        | Object(resolved) => {
+            let merged = [...Dict.toArray(resolved), ...Dict.toArray(obj)]->Dict.fromArray
+            Object(merged)
           }
+        | resolved if Dict.size(obj) > 0 => {
+            let merged = [...Dict.toArray(obj), ("value", resolved)]->Dict.fromArray
+            Object(merged)
+          }
+        | resolved => resolved
         }
       }
     | _ => {
+        // No ref, so we resolve nodes deeper in the object
         let arr = await obj
         ->Dict.mapValues(async child => await resolveNode(child, currentFilePath, cache, ancestry))
         ->Dict.toArray
@@ -136,7 +138,7 @@ and resolveNode = async (value: JSON.t, currentFilePath, cache, ancestry): JSON.
         ->Array.map(async ((key, promise)) => (key, await promise))
         ->Promise.all
 
-        JSON.Object(Dict.fromArray(arr))
+        Object(Dict.fromArray(arr))
       }
     }
   | x => x
