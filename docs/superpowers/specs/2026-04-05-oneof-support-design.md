@@ -60,6 +60,8 @@ Accepted form:
 - every branch has the same required discriminator property name
 - each branch constrains that discriminator to exactly one unique string literal value
 - that literal is expressed by either `const: "Tag"` or `enum: ["Tag"]`
+- discriminator detection is structural only; the OpenAPI `discriminator` keyword is not part of the supported surface in this change
+- the discriminator property schema itself must be inline; `$ref` is not allowed for the discriminator property in v1
 
 Representative example:
 
@@ -110,6 +112,8 @@ This should lower to a first-class discriminated union IR node and generate a Re
 - `oneOf` where the discriminator field is optional in any branch
 - `oneOf` where discriminator values are duplicated across branches
 - `oneOf` where discriminator values are not a single string literal
+- `oneOf` that relies on the OpenAPI `discriminator` keyword for acceptance
+- `oneOf` where the discriminator property schema is a `$ref`
 - `oneOf` where branch selection would require trying multiple schemas at runtime
 - `oneOf` that contains unsupported nested constructs such as `anyOf`, `allOf`, `not`, `if`, `then`, or `else`
 - OpenAPI 3.0 `nullable`
@@ -225,9 +229,12 @@ The output should be `Ir.Nullable(innerSchema)`.
 - inspect each branch before lowering to ensure the discriminator property:
   - exists in `properties`
   - is listed in `required`
+  - is inline rather than a `$ref`
   - is constrained by `const` or a single-value string enum
 - require all branches to use the same discriminator property name
 - require discriminator values to be unique strings
+
+The OpenAPI `discriminator` keyword should remain unsupported for this first pass. Branch acceptance should come entirely from structural detection of the branch-local discriminator property.
 
 For each accepted branch:
 
@@ -260,6 +267,19 @@ This keeps the feature surface small while avoiding a broader commitment to arbi
 - `DiscriminatedUnion` schema helper references in `schemaExpr`
 
 The exact formatting can vary, but printer logic should no longer treat these as unsupported fallbacks.
+
+### Dependency Traversal And Ordering
+
+Every helper that walks `Ir.schema` must learn the new nodes.
+
+In particular:
+
+- [EmitSchemas.res](/Users/paulb/Projects/rescript-openapi/packages/openapi-rescript-core/src/Codegen/EmitSchemas.res) `collectNamedSchemaDependencies` must recurse through `Nullable`
+- [EmitSchemas.res](/Users/paulb/Projects/rescript-openapi/packages/openapi-rescript-core/src/Codegen/EmitSchemas.res) `collectNamedSchemaDependencies` must recurse through every discriminated-union case payload schema
+- [EmitSchemas.res](/Users/paulb/Projects/rescript-openapi/packages/openapi-rescript-core/src/Codegen/EmitSchemas.res) `orderSchemas` must continue to use those collected dependencies so named refs reachable through union payloads are emitted in a valid order
+- any future `Ir.schema` walker added during implementation should treat missing `Nullable` or `DiscriminatedUnion` handling as a bug, not a fallback case
+
+This is required so a discriminated union case that carries a named schema payload still emits after its dependencies and does not silently miss dependency edges.
 
 ### Models
 
