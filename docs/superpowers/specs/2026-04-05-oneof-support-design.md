@@ -71,6 +71,8 @@ oneOf:
 
 This should lower to `Nullable(nonNullSchema)` in IR and generate a nullable ReScript type, where `nonNullSchema` may itself be a discriminated union.
 
+For CLI-driven generation, local `$ref` values are normally resolved before the core generator sees the schema. If the core still encounters a non-null `$ref` branch in this position, it should preserve the existing `NamedRef` behavior rather than trying to re-resolve the reference based on downstream shape analysis.
+
 ### 2. Discriminated Object Union
 
 Accepted form:
@@ -254,6 +256,8 @@ The output should be `Ir.Nullable(innerSchema)`.
 
 This keeps nullability compositional: the wrapped schema may be a plain supported schema or a supported discriminated union.
 
+If the remaining non-null shape is a `$ref` that still reaches core decode, the output should be `Ir.Nullable(Ir.NamedRef(...))`. The decoder should not attempt to inspect what that reference may resolve to later.
+
 ### Discriminated Union Detection
 
 `decodeDiscriminatedUnion` should:
@@ -374,7 +378,7 @@ Type names for named component schemas should continue to come from the existing
 For discriminated union constructors:
 
 - use the discriminator literal value as the source name
-- normalize through the existing enum-constructor naming rules
+- normalize through the existing enum-constructor naming rules, including the same reserved-name validation behavior
 - fail if normalization causes collisions
 
 Examples:
