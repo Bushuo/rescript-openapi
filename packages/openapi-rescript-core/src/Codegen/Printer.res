@@ -274,13 +274,13 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     schemaExpr(~qualified, inner) ++ ")"
   | Ir.DiscriminatedUnion({discriminator, cases}) =>
     let renderedCases = Array.map(cases, case_ => {
-      let wrapExpr = switch case_.schema {
+      let wrapExpr = switch case_.payload {
       | Ir.Object(fields) if Array.length(fields) == 0 =>
         "_payload => " ++ enumConstructor(~qualifiedModels=true, case_.tag)
       | _ =>
         "payload => " ++ enumConstructor(~qualifiedModels=true, case_.tag) ++ "(Obj.magic(payload))"
       }
-      let unwrapExpr = switch case_.schema {
+      let unwrapExpr = switch case_.payload {
       | Ir.Object(fields) if Array.length(fields) == 0 =>
         "value => switch value { | " ++
         enumConstructor(~qualifiedModels=true, case_.tag) ++
@@ -294,7 +294,7 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
       "{tag: " ++
       quote(case_.tag) ++
       ", schema: " ++
-      schemaExpr(~qualified, case_.schema) ++
+      schemaExpr(~qualified, case_.payload) ++
       ", wrap: " ++
       wrapExpr ++
       ", unwrap: " ++

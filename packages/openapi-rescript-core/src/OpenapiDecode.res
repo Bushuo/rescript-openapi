@@ -510,12 +510,12 @@ let rec liftEnumSchema = (
         ~segments=appendSegment(segments, case_.tag),
         ~reservedNames,
         ~liftedSchemas,
-        case_.schema,
+        case_.payload,
       ) {
       | Ok(schema) =>
         let nextCase: Ir.unionCase = {
           tag: case_.tag,
-          schema,
+          payload: schema,
         }
         Ok(nextCase)
       | Error(problem) => Error(problem)

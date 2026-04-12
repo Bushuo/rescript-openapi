@@ -30,13 +30,13 @@ let renderEnum = (~name: string, ~enumMode: Ir.enumMode, values: array<string>):
 
 let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => {
   let constructorLines = Array.map(cases, case_ =>
-    switch case_.schema {
+    switch case_.payload {
     | Ir.Object(fields) if Array.length(fields) == 0 =>
       Printer.indentLine(~level=1, "| " ++ Printer.enumConstructor(case_.tag))
     | _ =>
       Printer.indentLine(
         ~level=1,
-        "| " ++ Printer.enumConstructor(case_.tag) ++ "(" ++ Printer.modelType(case_.schema) ++ ")",
+        "| " ++ Printer.enumConstructor(case_.tag) ++ "(" ++ Printer.modelType(case_.payload) ++ ")",
       )
     }
   )

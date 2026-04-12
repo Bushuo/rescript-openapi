@@ -19,7 +19,7 @@ and objectField = {
 
 and unionCase = {
   tag: string,
-  schema: schema,
+  payload: schema,
 }
 
 type namedSchema = {

@@ -89,7 +89,7 @@ let rec collectNamedSchemaDependencies = (schema: Ir.schema): array<string> =>
     let dependencies = ref([])
 
     Array.forEach(cases, case_ =>
-      Array.forEach(collectNamedSchemaDependencies(case_.schema), dependency => {
+      Array.forEach(collectNamedSchemaDependencies(case_.payload), dependency => {
         dependencies.contents = appendUnique(dependencies.contents, dependency)
       })
     )

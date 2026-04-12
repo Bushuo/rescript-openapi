@@ -235,10 +235,10 @@ describe("decodeDocument", () => {
         TAG: "DiscriminatedUnion",
         discriminator: "kind",
         cases: [
-          {tag: "Male", schema: {TAG: "Object", _0: []}},
+          {tag: "Male", payload: {TAG: "Object", _0: []}},
           {
             tag: "Female",
-            schema: {
+            payload: {
               TAG: "Object",
               _0: expect.arrayContaining([
                 {
@@ -249,11 +249,11 @@ describe("decodeDocument", () => {
               ]),
             },
           },
-          {tag: "PreferNotToSay", schema: {TAG: "Object", _0: []}},
+          {tag: "PreferNotToSay", payload: {TAG: "Object", _0: []}},
         ],
       },
     })
-    expect(gender.schema.cases.find(case_ => case_.tag === "Female").schema._0).toEqual(
+    expect(gender.schema.cases.find(case_ => case_.tag === "Female").payload._0).toEqual(
       expect.not.arrayContaining([expect.objectContaining({name: "kind"})]),
     )
   })
@@ -279,8 +279,8 @@ describe("decodeDocument", () => {
           TAG: "DiscriminatedUnion",
           discriminator: "kind",
           cases: [
-            {tag: "Male", schema: {TAG: "Object", _0: []}},
-            {tag: "Female", schema: {TAG: "Object", _0: []}},
+            {tag: "Male", payload: {TAG: "Object", _0: []}},
+            {tag: "Female", payload: {TAG: "Object", _0: []}},
           ],
         },
       },

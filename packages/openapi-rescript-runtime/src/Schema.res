@@ -56,7 +56,7 @@ let array = (item: t<'value>): t<array<'value>> => S.array(item)
 
 let nullableAsOption = (schema: t<'value>): t<option<'value>> => S.null(schema)
 
-let stripDiscriminator = (discriminator: string, objectJson: dict<Js.Json.t>): dict<Js.Json.t> => {
+let stripDiscriminator = (discriminator: string, objectJson: dict<JSON.t>): dict<JSON.t> => {
   let payload = Dict.make()
 
   Dict.forEachWithKey(objectJson, (value, key) => {
@@ -71,8 +71,8 @@ let stripDiscriminator = (discriminator: string, objectJson: dict<Js.Json.t>): d
 let addDiscriminator = (
   discriminator: string,
   tag: string,
-  payloadJson: dict<Js.Json.t>,
-): dict<Js.Json.t> => {
+  payloadJson: dict<JSON.t>,
+): dict<JSON.t> => {
   let output = Dict.make()
 
   Dict.forEachWithKey(payloadJson, (value, key) => Dict.set(output, key, value))

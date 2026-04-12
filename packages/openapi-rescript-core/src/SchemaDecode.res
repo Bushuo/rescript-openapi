@@ -369,7 +369,7 @@ and decodeDiscriminatedUnion = (~path: array<string>, oneOfJson: JSON.t): result
                 let unionCases: array<Ir.unionCase> = Array.map(cases, case_ => {
                   let unionCase: Ir.unionCase = {
                     tag: case_.tag,
-                    schema: case_.payload,
+                    payload: case_.payload,
                   }
                   unionCase
                 })
