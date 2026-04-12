@@ -39,8 +39,8 @@ The generator should accept exactly two categories of `oneOf`.
 
 Accepted forms:
 
-- `oneOf: [{type: "null"}, T]`
-- `oneOf: [T, {type: "null"}]`
+- `oneOf` with exactly one `type: "null"` branch
+- the remaining branches must collectively decode as one supported non-null shape
 
 Representative example:
 
@@ -50,7 +50,26 @@ oneOf:
   - $ref: "#/components/schemas/AlcoholHabitsDto"
 ```
 
-This should lower to `Nullable(T)` in IR and generate a nullable ReScript type.
+Nullable discriminated unions are also supported when the non-null branches form a supported discriminated object union:
+
+```yaml
+oneOf:
+  - type: object
+    required: [kind]
+    properties:
+      kind:
+        type: string
+        enum: ["Male"]
+  - type: object
+    required: [kind]
+    properties:
+      kind:
+        type: string
+        enum: ["Female"]
+  - type: "null"
+```
+
+This should lower to `Nullable(nonNullSchema)` in IR and generate a nullable ReScript type, where `nonNullSchema` may itself be a discriminated union.
 
 ### 2. Discriminated Object Union
 
@@ -95,16 +114,17 @@ This should lower to a first-class discriminated union IR node and generate a Re
 
 ### Accept
 
-- `oneOf` with exactly one `null` branch and one non-null branch
+- `oneOf` with exactly one `null` branch and one supported non-null shape
 - `oneOf` of object branches with a shared required discriminator field
+- nullable discriminated unions, where the non-null branches form a supported discriminated object union
 - discriminator literals expressed with `const`
 - discriminator literals expressed with single-value string enums
 - branches that use `$ref` within otherwise supported object fields
 
 ### Reject
 
-- `oneOf` with more than two branches when one branch is `null`
-- `oneOf` with multiple non-null branches plus `null`
+- `oneOf` with more than one `null` branch
+- `oneOf` with one `null` branch plus remaining branches that do not form a single supported non-null shape
 - `oneOf` with scalar branches
 - `oneOf` with array branches
 - `oneOf` with mixed object and scalar branches except the `null | T` special case
@@ -134,6 +154,16 @@ type alcoholHabitsDto = option<Models.alcoholHabitsDto>
 ```
 
 The exact codegen surface may use a dedicated runtime helper or the existing option support in Sury, but the generated model type should behave as a nullable value rather than a two-case custom variant.
+
+When the wrapped schema is a discriminated union, nullability should wrap the union rather than becoming a separate constructor.
+
+Representative target shape:
+
+```rescript
+type genderDto = option<Models.genderDto_nonNull>
+```
+
+The exact naming can vary, but the design intent is `Nullable(DiscriminatedUnion(...))`, not a bespoke `Null | Male | Female` variant.
 
 ### Discriminated Unions
 
@@ -205,20 +235,24 @@ Instead:
 
 1. If `oneOf` is present, call a dedicated `decodeOneOf` helper.
 2. `decodeOneOf` should try the supported cases in a fixed order:
-   - `decodeNullUnion`
+   - `decodeNullableOneOf`
    - `decodeDiscriminatedUnion`
 3. If neither helper succeeds, fail with a precise diagnostic at the `oneOf` path.
 
 ### Null Union Detection
 
-`decodeNullUnion` should:
+`decodeNullableOneOf` should:
 
-- require exactly two branches
 - require exactly one branch to be `type: "null"`
-- decode the non-null branch with the existing schema decoder
-- reject nested unsupported constructs inside the non-null branch as usual
+- collect the remaining non-null branches
+- decode the remaining branches as one supported non-null shape
+- if the remaining set has one branch, decode it with the existing schema decoder
+- if the remaining set has multiple branches, allow it only if it decodes as a supported discriminated union
+- reject nested unsupported constructs inside the non-null shape as usual
 
 The output should be `Ir.Nullable(innerSchema)`.
+
+This keeps nullability compositional: the wrapped schema may be a plain supported schema or a supported discriminated union.
 
 ### Discriminated Union Detection
 
@@ -356,7 +390,8 @@ Failure messages should remain precise and point to the offending path.
 Important failure cases:
 
 - unsupported `oneOf` shape
-- null union with wrong arity
+- nullable `oneOf` with more than one `null` branch
+- nullable `oneOf` whose remaining branches do not form a supported non-null shape
 - discriminated union branch missing discriminator field
 - discriminator field not required
 - discriminator literal not a single string
@@ -368,6 +403,7 @@ Representative diagnostic messages:
 
 - `Unsupported schema construct: oneOf`
 - `Unsupported oneOf shape: expected null union or discriminated object union`
+- `Unsupported oneOf shape: expected exactly one null branch plus one supported non-null shape`
 - `Invalid discriminated union: discriminator field "kind" must be required in every branch`
 - `Invalid discriminated union: duplicate discriminator value "Male"`
 
@@ -380,7 +416,9 @@ Add tests at four layers.
 ### Core Decode Tests
 
 - accepts `oneOf` null unions
-- rejects `oneOf` null unions with more than two branches
+- accepts nullable discriminated unions
+- rejects `oneOf` with more than one `null` branch
+- rejects nullable `oneOf` whose non-null branches do not form a supported shape
 - accepts discriminated unions with `enum: ["Tag"]`
 - accepts discriminated unions with `const: "Tag"`
 - rejects branches missing the discriminator
