@@ -161,6 +161,84 @@ describe("codegen", () => {
     )
   })
 
+  it("emits nullable refs and discriminated unions in generated model files", () => {
+    let oneOfFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "OneOf Shapes API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          AlcoholHabitsDto: {
+            type: "object",
+            properties: {},
+          },
+          PregnancyStatusDto: {
+            type: "object",
+            properties: {},
+          },
+          Person: {
+            oneOf: [{type: "null"}, {$ref: "#/components/schemas/AlcoholHabitsDto"}],
+          },
+          Gender: {
+            oneOf: [
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {type: "string", enum: ["Male"]},
+                },
+              },
+              {
+                type: "object",
+                required: ["kind", "value"],
+                properties: {
+                  kind: {const: "Female"},
+                  value: {$ref: "#/components/schemas/PregnancyStatusDto"},
+                },
+              },
+            ],
+          },
+          NullableGender: {
+            oneOf: [
+              {type: "null"},
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {type: "string", enum: ["Male"]},
+                },
+              },
+              {
+                type: "object",
+                required: ["kind", "value"],
+                properties: {
+                  kind: {const: "Female"},
+                  value: {$ref: "#/components/schemas/PregnancyStatusDto"},
+                },
+              },
+            ],
+          },
+        },
+      },
+      paths: {},
+    }
+
+    let output = generate(oneOfFixture)
+    let models = generatedFile(output, "Models.res")
+    let schemas = generatedFile(output, "Schemas.res")
+
+    expect(output.ok).toBe(true)
+    expect(models).toContain("type person = option<alcoholHabitsDto>")
+    expect(models).toContain("type gender =")
+    expect(models).toContain("| Female({ value: pregnancyStatusDto })")
+    expect(models).toContain("type nullableGender = option<")
+    expect(schemas).toContain("nullableAsOption(")
+    expect(schemas).toContain('discriminatedUnion(~discriminator="kind"')
+    expect(schemas.indexOf("let pregnancyStatusDto")).toBeLessThan(schemas.indexOf("let gender"))
+  })
+
   it("rejects open enums when a declared value normalizes to the reserved Unknown constructor", () => {
     let reservedUnknownEnum = {
       openapi: "3.1.0",

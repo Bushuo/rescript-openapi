@@ -8,6 +8,8 @@ let string: t<string> = OpenapiRescriptRuntime.Schema.string
 let integer: t<int> = OpenapiRescriptRuntime.Schema.integer
 let number: t<float> = OpenapiRescriptRuntime.Schema.number
 let boolean: t<bool> = OpenapiRescriptRuntime.Schema.boolean
+let nullableAsOption = OpenapiRescriptRuntime.Schema.nullableAsOption
+let discriminatedUnion = OpenapiRescriptRuntime.Schema.discriminatedUnion
 let array = OpenapiRescriptRuntime.Schema.array
 let object_ = OpenapiRescriptRuntime.Schema.object_
 

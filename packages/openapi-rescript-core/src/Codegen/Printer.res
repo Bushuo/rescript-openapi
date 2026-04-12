@@ -200,6 +200,8 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.Scalar(_) => "Js.Json.t"
   | Ir.StringEnum(_) => "string"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
+  | Ir.Nullable(inner) => "option<" ++ modelType(~qualifiedNamedRefs, inner) ++ ">"
+  | Ir.DiscriminatedUnion(_) => "Js.Json.t"
   | Ir.NamedRef(reference) =>
     enumTypeRef(~qualifiedModels=qualifiedNamedRefs, refName(reference))
   | Ir.Object(fields) =>
@@ -262,6 +264,54 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     } ++
     "(" ++
     schemaExpr(~qualified, item) ++ ")"
+  | Ir.Nullable(inner) =>
+    if qualified {
+      "Schemas.nullableAsOption"
+    } else {
+      "nullableAsOption"
+    } ++
+    "(" ++
+    schemaExpr(~qualified, inner) ++ ")"
+  | Ir.DiscriminatedUnion({discriminator, cases}) =>
+    let renderedCases = Array.map(cases, case_ => {
+      let wrapExpr = switch case_.schema {
+      | Ir.Object(fields) if Array.length(fields) == 0 =>
+        "_payload => " ++ enumConstructor(~qualifiedModels=true, case_.tag)
+      | _ =>
+        "payload => " ++ enumConstructor(~qualifiedModels=true, case_.tag) ++ "(Obj.magic(payload))"
+      }
+      let unwrapExpr = switch case_.schema {
+      | Ir.Object(fields) if Array.length(fields) == 0 =>
+        "value => switch value { | " ++
+        enumConstructor(~qualifiedModels=true, case_.tag) ++
+        " => Some(Obj.magic({})) | _ => None }"
+      | _ =>
+        "value => switch value { | " ++
+        enumConstructor(~qualifiedModels=true, case_.tag) ++
+        "(payload) => Some(Obj.magic(payload)) | _ => None }"
+      }
+
+      "{tag: " ++
+      quote(case_.tag) ++
+      ", schema: " ++
+      schemaExpr(~qualified, case_.schema) ++
+      ", wrap: " ++
+      wrapExpr ++
+      ", unwrap: " ++
+      unwrapExpr ++
+      "}"
+    })
+
+    (if qualified {
+      "Schemas.discriminatedUnion"
+    } else {
+      "discriminatedUnion"
+    }) ++
+    "(~discriminator=" ++
+    quote(discriminator) ++
+    ", [" ++
+    Belt.Array.joinWith(renderedCases, ", ", value => value) ++
+    "])"
   | Ir.NamedRef(reference) =>
     enumSchemaExpr(~qualifiedSchemas=qualified, refName(reference))
   | Ir.Object(fields) =>

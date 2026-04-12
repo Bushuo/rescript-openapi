@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: Supported OneOf API
+  version: 1.0.0
+paths:
+  /profiles:
+    get:
+      operationId: getProfiles
+      responses:
+        "200":
+          description: Profile snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - featuredPerson
+                  - featuredGender
+                  - nullableFeaturedGender
+                properties:
+                  featuredPerson:
+                    oneOf:
+                      - type: "null"
+                      - $ref: "#/components/schemas/AlcoholHabitsDto"
+                  featuredGender:
+                    oneOf:
+                      - type: object
+                        required: [kind]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [Male]
+                      - type: object
+                        required: [kind, value]
+                        properties:
+                          kind:
+                            const: Female
+                          value:
+                            $ref: "#/components/schemas/PregnancyStatusDto"
+                      - type: object
+                        required: [kind]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [PreferNotToSay]
+                  nullableFeaturedGender:
+                    oneOf:
+                      - type: "null"
+                      - type: object
+                        required: [kind]
+                        properties:
+                          kind:
+                            type: string
+                            enum: [Male]
+                      - type: object
+                        required: [kind, value]
+                        properties:
+                          kind:
+                            const: Female
+                          value:
+                            $ref: "#/components/schemas/PregnancyStatusDto"
+components:
+  schemas:
+    AlcoholHabitsDto:
+      type: object
+      properties: {}
+    PregnancyStatusDto:
+      type: object
+      properties: {}
+    Person:
+      oneOf:
+        - type: "null"
+        - $ref: "#/components/schemas/AlcoholHabitsDto"
+    Gender:
+      oneOf:
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              enum: [Male]
+        - type: object
+          required: [kind, value]
+          properties:
+            kind:
+              const: Female
+            value:
+              $ref: "#/components/schemas/PregnancyStatusDto"
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              enum: [PreferNotToSay]
+    NullableGender:
+      oneOf:
+        - type: "null"
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              enum: [Male]
+        - type: object
+          required: [kind, value]
+          properties:
+            kind:
+              const: Female
+            value:
+              $ref: "#/components/schemas/PregnancyStatusDto"

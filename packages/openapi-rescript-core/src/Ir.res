@@ -8,10 +8,17 @@ type rec schema =
   | Array(schema)
   | Object(array<objectField>)
   | NamedRef(string)
+  | Nullable(schema)
+  | DiscriminatedUnion({discriminator: string, cases: array<unionCase>})
 
 and objectField = {
   name: string,
   required: bool,
+  schema: schema,
+}
+
+and unionCase = {
+  tag: string,
   schema: schema,
 }
 

@@ -28,6 +28,22 @@ let renderEnum = (~name: string, ~enumMode: Ir.enumMode, values: array<string>):
   ])
 }
 
+let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => {
+  let constructorLines = Array.map(cases, case_ =>
+    switch case_.schema {
+    | Ir.Object(fields) if Array.length(fields) == 0 =>
+      Printer.indentLine(~level=1, "| " ++ Printer.enumConstructor(case_.tag))
+    | _ =>
+      Printer.indentLine(
+        ~level=1,
+        "| " ++ Printer.enumConstructor(case_.tag) ++ "(" ++ Printer.modelType(case_.schema) ++ ")",
+      )
+    }
+  )
+
+  Belt.Array.concat(["type " ++ Printer.typeName(name) ++ " ="], constructorLines)
+}
+
 let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
@@ -39,6 +55,21 @@ let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<strin
       ["}"],
     ])
   | Ir.StringEnum({values, _}) => renderEnum(~name=schema.name, ~enumMode, values)
+  | Ir.DiscriminatedUnion({cases, _}) => renderUnion(~name=schema.name, cases)
+  | Ir.Nullable(Ir.DiscriminatedUnion({cases, _})) =>
+    let valueTypeName = schema.name ++ "Value"
+
+    Belt.Array.concatMany([
+      renderUnion(~name=valueTypeName, cases),
+      [""],
+      [
+        "type " ++
+        Printer.typeName(schema.name) ++
+        " = option<" ++
+        Printer.typeName(valueTypeName) ++
+        ">",
+      ],
+    ])
   | value => ["type " ++ Printer.typeName(schema.name) ++ " = " ++ Printer.modelType(value)]
   }
 

@@ -497,6 +497,33 @@ let rec liftEnumSchema = (
     | Ok(nextFields) => Ok(Ir.Object(nextFields))
     | Error(problem) => Error(problem)
     }
+  | Ir.Nullable(inner) =>
+    switch liftEnumSchema(~path, ~scope, ~segments, ~reservedNames, ~liftedSchemas, inner) {
+    | Ok(nextInner) => Ok(Ir.Nullable(nextInner))
+    | Error(problem) => Error(problem)
+    }
+  | Ir.DiscriminatedUnion({discriminator, cases}) =>
+    switch collectArray(cases, (case_, _) =>
+      switch liftEnumSchema(
+        ~path=at(path, case_.tag),
+        ~scope,
+        ~segments=appendSegment(segments, case_.tag),
+        ~reservedNames,
+        ~liftedSchemas,
+        case_.schema,
+      ) {
+      | Ok(schema) =>
+        let nextCase: Ir.unionCase = {
+          tag: case_.tag,
+          schema,
+        }
+        Ok(nextCase)
+      | Error(problem) => Error(problem)
+      }
+    ) {
+    | Ok(nextCases) => Ok(Ir.DiscriminatedUnion({discriminator, cases: nextCases}))
+    | Error(problem) => Error(problem)
+    }
   }
 
 let liftNamedSchemaEnums = (

@@ -61,9 +61,35 @@ describe("generateClient", () => {
           "properties",
           "details",
           "oneOf",
+          "0",
+          "type",
         ],
-        message: "Unsupported schema construct: oneOf",
+        message: "Unsupported schema construct: type:string",
       })
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
+  it("generates clients for supported oneOf schemas", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const result = runCli(resolve("fixtures/specs/oneof-supported.yaml"), targetDir)
+      const models = readFileSync(join(targetDir, "Models.res"), "utf8")
+      const schemas = readFileSync(join(targetDir, "Schemas.res"), "utf8")
+      const operations = readFileSync(join(targetDir, "Default_.res"), "utf8")
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+      expect(models).toContain("type person = option<")
+      expect(models).toContain("| Female")
+      expect(models).toContain("type nullableGender = option<")
+      expect(schemas).toContain("nullableAsOption(")
+      expect(schemas).toContain('discriminatedUnion(~discriminator="kind"')
+      expect(operations).toContain("Schemas.nullableAsOption(")
+      expect(operations).toContain('Schemas.discriminatedUnion(~discriminator="kind"')
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
     }
@@ -208,8 +234,8 @@ describe("generateClient", () => {
       expect(result.exitCode).toBe(1)
       expect(result.stdout).toBe("")
       expect(JSON.parse(result.stderr)).toMatchObject({
-        path: ["components", "schemas", "WeirdType", "oneOf"],
-        message: "Unsupported schema construct: oneOf",
+        path: ["components", "schemas", "WeirdType", "oneOf", "0", "type"],
+        message: "Unsupported schema construct: type:string",
       })
       expect(readdirSync(targetDir)).toEqual([])
     } finally {

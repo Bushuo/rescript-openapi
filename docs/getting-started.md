@@ -81,6 +81,9 @@ V1 supports a strict subset of OpenAPI 3.1:
 - JSON media types only, including `application/json` and `application/*+json`
 - auth support limited to `apiKey` in header/query/cookie plus `http` basic and bearer schemes
 - string enums in both default open mode and `--enum-mode=closed`
+- a strict `oneOf` subset:
+  nullable wrappers with exactly one `null` branch plus one supported non-null schema, and
+  structurally safe discriminated object unions with inline literal discriminator values
 
 Unsupported constructs are rejected instead of being approximated.
 
@@ -96,4 +99,4 @@ On failure it:
 
 The CLI also writes `.openapi-rescript-generated.json` in the output directory so later runs can track which files were generated and clean up stale artifacts safely.
 
-For example, `fixtures/specs/unsupported-schema.yaml` intentionally fails because the schema uses `oneOf`, which is currently unsupported in this generator subset.
+For example, `fixtures/specs/unsupported-schema.yaml` intentionally fails because it uses an unsupported `oneOf` shape. Scalar unions, ambiguous unions, and other `oneOf` forms outside the supported nullable-wrapper and discriminated-object subset are still rejected.

@@ -9,6 +9,8 @@ let baseHeader = [
   "let integer: t<int> = OpenapiRescriptRuntime.Schema.integer",
   "let number: t<float> = OpenapiRescriptRuntime.Schema.number",
   "let boolean: t<bool> = OpenapiRescriptRuntime.Schema.boolean",
+  "let nullableAsOption = OpenapiRescriptRuntime.Schema.nullableAsOption",
+  "let discriminatedUnion = OpenapiRescriptRuntime.Schema.discriminatedUnion",
   "let array = OpenapiRescriptRuntime.Schema.array",
   "let object_ = OpenapiRescriptRuntime.Schema.object_",
 ]
@@ -81,7 +83,18 @@ let rec collectNamedSchemaDependencies = (schema: Ir.schema): array<string> =>
   switch schema {
   | Ir.Scalar(_) | Ir.StringEnum(_) => []
   | Ir.Array(item) => collectNamedSchemaDependencies(item)
+  | Ir.Nullable(inner) => collectNamedSchemaDependencies(inner)
   | Ir.NamedRef(reference) => [Printer.refName(reference)]
+  | Ir.DiscriminatedUnion({cases, _}) =>
+    let dependencies = ref([])
+
+    Array.forEach(cases, case_ =>
+      Array.forEach(collectNamedSchemaDependencies(case_.schema), dependency => {
+        dependencies.contents = appendUnique(dependencies.contents, dependency)
+      })
+    )
+
+    dependencies.contents
   | Ir.Object(fields) =>
     let dependencies = ref([])
 

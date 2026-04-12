@@ -484,6 +484,53 @@ describe("naming and auth normalization", () => {
     })
   })
 
+  it("rejects discriminated-union constructor collisions after normalization", () => {
+    let collidingUnionFixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Union Constructor Collision API",
+        version: "1.0.0",
+      },
+      paths: {},
+      components: {
+        schemas: {
+          Gender: {
+            oneOf: [
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {
+                    type: "string",
+                    enum: ["Prefer-Not-To-Say"],
+                  },
+                },
+              },
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {
+                    type: "string",
+                    enum: ["Prefer_Not_To_Say"],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+
+    expect(generate(collidingUnionFixture)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Gender", "oneOf", "1", "properties", "kind", "enum", "0"],
+        message: "Enum constructor collision after normalization: PreferNotToSay",
+      },
+    })
+  })
+
   it("rejects unsupported OAuth security schemes", () => {
     let unsupportedAuth = {
       ...authenticatedApi,

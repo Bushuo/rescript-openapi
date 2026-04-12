@@ -41,6 +41,72 @@ describe("openapi-rescript-runtime", () => {
     expect(S.reverseConvertToJsonStringOrThrow(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
   })
 
+  it("decodes nullable option schemas from null and non-null JSON", async () => {
+    let {Schema, S} = await loadRuntime()
+    let nullableString = Schema.nullableAsOption(Schema.string)
+
+    expect(S.parseJsonStringOrThrow("null", nullableString)).toBeUndefined()
+    expect(S.parseJsonStringOrThrow(JSON.stringify("Ada"), nullableString)).toBe("Ada")
+    expect(S.reverseConvertToJsonStringOrThrow(undefined, nullableString)).toBe("null")
+    expect(S.reverseConvertToJsonStringOrThrow("Ada", nullableString)).toBe(JSON.stringify("Ada"))
+  })
+
+  it("decodes and re-encodes discriminated unions", async () => {
+    let {Schema, S} = await loadRuntime()
+
+    let genderSchema = Schema.discriminatedUnion("kind", [
+        {
+          tag: "Male",
+          schema: Schema.object_([]),
+          wrap: _payload => ({TAG: "Male"}),
+          unwrap: value => (value.TAG === "Male" ? {} : undefined),
+        },
+        {
+          tag: "Female",
+          schema: Schema.object_([Schema.field({name: "value", required: true}, Schema.bool)]),
+          wrap: payload => ({TAG: "Female", _0: payload}),
+          unwrap: value => (value.TAG === "Female" ? value._0 : undefined),
+        },
+      ])
+
+    expect(S.parseJsonStringOrThrow(JSON.stringify({kind: "Male"}), genderSchema)).toEqual({TAG: "Male"})
+    expect(
+      S.parseJsonStringOrThrow(JSON.stringify({kind: "Female", value: true}), genderSchema),
+    ).toEqual({
+      TAG: "Female",
+      _0: {value: true},
+    })
+    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({TAG: "Male"}, genderSchema))).toEqual({
+      kind: "Male",
+    })
+    expect(
+      JSON.parse(
+        S.reverseConvertToJsonStringOrThrow({TAG: "Female", _0: {value: true}}, genderSchema),
+      ),
+    ).toEqual({
+      kind: "Female",
+      value: true,
+    })
+  })
+
+  it("reports missing and unknown discriminators precisely", async () => {
+    let {Schema, S} = await loadRuntime()
+
+    let genderSchema = Schema.discriminatedUnion("kind", [
+        {
+          tag: "Male",
+          schema: Schema.object_([]),
+          wrap: _payload => ({TAG: "Male"}),
+          unwrap: value => (value.TAG === "Male" ? {} : undefined),
+        },
+      ])
+
+    expect(() => S.parseJsonStringOrThrow(JSON.stringify({}), genderSchema)).toThrow(/kind/)
+    expect(() => S.parseJsonStringOrThrow(JSON.stringify({kind: "Female"}), genderSchema)).toThrow(
+      /Unknown discriminator value/,
+    )
+  })
+
   it("encodes a JSON request body and decodes the typed JSON response", async () => {
     let fetchMock = vi.fn(async (_url, init) => {
       expect(init.method).toBe("POST")

@@ -14,6 +14,22 @@ const normalizedEnums = JSON.parse(
 
 const findSchema = (schemas, name) => schemas.find(schema => schema.name === name)
 
+const emptyApi = title => ({
+  openapi: "3.1.0",
+  info: {title, version: "1.0.0"},
+  paths: {},
+  components: {schemas: {}},
+})
+
+const discriminatedBranch = ({tag, tagMode = "enum", properties = {}, required = []}) => ({
+  type: "object",
+  required: ["kind", ...required],
+  properties: {
+    kind: tagMode === "const" ? {const: tag} : {type: "string", enum: [tag]},
+    ...properties,
+  },
+})
+
 describe("decodeDocument", () => {
   it("decodes a supported OpenAPI 3.1 document into IR", () => {
     let output = generate(normalizedPetstore)
@@ -132,7 +148,203 @@ describe("decodeDocument", () => {
     expect(generate(normalizedUnsupported)).toMatchObject({
       ok: false,
       error: {
-        path: ["components", "schemas", "WeirdType", "oneOf"],
+        path: ["components", "schemas", "WeirdType", "oneOf", "0", "type"],
+      },
+    })
+  })
+
+  it("decodes oneOf [null, $ref] as Nullable(NamedRef)", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {title: "Nullable Ref API", version: "1.0.0"},
+      paths: {},
+      components: {
+        schemas: {
+          AlcoholHabitsDto: {
+            type: "object",
+            properties: {},
+          },
+          Person: {
+            oneOf: [{type: "null"}, {$ref: "#/components/schemas/AlcoholHabitsDto"}],
+          },
+        },
+      },
+    }
+
+    let output = generate(fixture)
+
+    expect(output.ok).toBe(true)
+    expect(findSchema(output.value.schemas, "Person")).toEqual({
+      name: "Person",
+      schema: {
+        TAG: "Nullable",
+        _0: {TAG: "NamedRef", _0: "#/components/schemas/AlcoholHabitsDto"},
+      },
+    })
+  })
+
+  it("rejects nullable oneOf schemas with multiple null branches", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {title: "Broken Nullable API", version: "1.0.0"},
+      paths: {},
+      components: {
+        schemas: {
+          Person: {
+            oneOf: [{type: "null"}, {type: "null"}, {type: "string"}],
+          },
+        },
+      },
+    }
+
+    expect(generate(fixture)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Person", "oneOf"],
+      },
+    })
+  })
+
+  it("decodes supported discriminated object unions", () => {
+    let fixture = emptyApi("Gender API")
+    fixture.components.schemas.PregnancyStatusDto = {
+      type: "object",
+      properties: {},
+    }
+    fixture.components.schemas.Gender = {
+      oneOf: [
+        discriminatedBranch({tag: "Male"}),
+        discriminatedBranch({
+          tag: "Female",
+          properties: {
+            value: {$ref: "#/components/schemas/PregnancyStatusDto"},
+          },
+          required: ["value"],
+        }),
+        discriminatedBranch({tag: "PreferNotToSay", tagMode: "const"}),
+      ],
+    }
+
+    let output = generate(fixture)
+    let gender = findSchema(output.value.schemas, "Gender")
+
+    expect(output.ok).toBe(true)
+    expect(gender).toEqual({
+      name: "Gender",
+      schema: {
+        TAG: "DiscriminatedUnion",
+        discriminator: "kind",
+        cases: [
+          {tag: "Male", schema: {TAG: "Object", _0: []}},
+          {
+            tag: "Female",
+            schema: {
+              TAG: "Object",
+              _0: expect.arrayContaining([
+                {
+                  name: "value",
+                  required: true,
+                  schema: {TAG: "NamedRef", _0: "#/components/schemas/PregnancyStatusDto"},
+                },
+              ]),
+            },
+          },
+          {tag: "PreferNotToSay", schema: {TAG: "Object", _0: []}},
+        ],
+      },
+    })
+    expect(gender.schema.cases.find(case_ => case_.tag === "Female").schema._0).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({name: "kind"})]),
+    )
+  })
+
+  it("decodes nullable discriminated object unions", () => {
+    let fixture = emptyApi("Nullable Gender API")
+    fixture.components.schemas.Gender = {
+      oneOf: [
+        {type: "null"},
+        discriminatedBranch({tag: "Male"}),
+        discriminatedBranch({tag: "Female"}),
+      ],
+    }
+
+    let output = generate(fixture)
+
+    expect(output.ok).toBe(true)
+    expect(findSchema(output.value.schemas, "Gender")).toEqual({
+      name: "Gender",
+      schema: {
+        TAG: "Nullable",
+        _0: {
+          TAG: "DiscriminatedUnion",
+          discriminator: "kind",
+          cases: [
+            {tag: "Male", schema: {TAG: "Object", _0: []}},
+            {tag: "Female", schema: {TAG: "Object", _0: []}},
+          ],
+        },
+      },
+    })
+  })
+
+  it("rejects discriminated unions when the discriminator is not required in every branch", () => {
+    let fixture = emptyApi("Broken Gender API")
+    fixture.components.schemas.Gender = {
+      oneOf: [
+        {
+          type: "object",
+          properties: {
+            kind: {type: "string", enum: ["Male"]},
+          },
+        },
+        discriminatedBranch({tag: "Female"}),
+      ],
+    }
+
+    expect(generate(fixture)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Gender", "oneOf"],
+      },
+    })
+  })
+
+  it("rejects discriminated unions with duplicate discriminator values", () => {
+    let fixture = emptyApi("Duplicate Gender API")
+    fixture.components.schemas.Gender = {
+      oneOf: [discriminatedBranch({tag: "Male"}), discriminatedBranch({tag: "Male"})],
+    }
+
+    expect(generate(fixture)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Gender", "oneOf", "1", "properties", "kind", "enum", "0"],
+      },
+    })
+  })
+
+  it("rejects discriminated unions with $ref discriminator schemas", () => {
+    let fixture = emptyApi("Ref Gender API")
+    fixture.components.schemas.GenderTag = {
+      type: "string",
+      enum: ["Male"],
+    }
+    fixture.components.schemas.Gender = {
+      oneOf: [
+        {
+          type: "object",
+          required: ["kind"],
+          properties: {
+            kind: {$ref: "#/components/schemas/GenderTag"},
+          },
+        },
+      ],
+    }
+
+    expect(generate(fixture)).toMatchObject({
+      ok: false,
+      error: {
+        path: ["components", "schemas", "Gender", "oneOf", "0", "properties", "kind", "$ref"],
       },
     })
   })

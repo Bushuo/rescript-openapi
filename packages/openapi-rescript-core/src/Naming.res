@@ -6,6 +6,11 @@ type enumScope =
   | Request(string)
   | Response(string)
 
+type constructorEntry = {
+  path: array<string>,
+  wireValue: string,
+}
+
 @send external split: (string, string) => array<string> = "split"
 @send external charAt: (string, int) => string = "charAt"
 @send external sliceFrom: (string, int) => string = "slice"
@@ -317,19 +322,19 @@ let ensureUniqueEnumTypeName = (
   }
 }
 
-let validateEnumConstructors = (~path: array<string>, values: array<string>): result<unit> => {
+let validateConstructorEntries = (entries: array<constructorEntry>): result<unit> => {
   let seen = ref([])
   let error = ref(None)
 
-  Array.forEachWithIndex(values, (value, index) =>
+  Array.forEach(entries, entry =>
     switch error.contents {
     | Some(_) => ()
     | None =>
-      let constructorName = enumConstructorName(value)
+      let constructorName = enumConstructorName(entry.wireValue)
       if Array.some(seen.contents, existing => existing == constructorName) {
         error.contents = Some(
           Diagnostics.make(
-            ~path=Belt.Array.concat(path, [Int.toString(index)]),
+            ~path=entry.path,
             ~message="Enum constructor collision after normalization: " ++ constructorName,
           ),
         )
@@ -345,22 +350,29 @@ let validateEnumConstructors = (~path: array<string>, values: array<string>): re
   }
 }
 
-let validateReservedEnumConstructor = (
-  ~path: array<string>,
+let validateEnumConstructors = (~path: array<string>, values: array<string>): result<unit> =>
+  validateConstructorEntries(
+    Array.mapWithIndex(values, (value, index) => {
+      path: Belt.Array.concat(path, [Int.toString(index)]),
+      wireValue: value,
+    }),
+  )
+
+let validateReservedConstructorEntries = (
   ~reservedConstructorName: string,
-  values: array<string>,
+  entries: array<constructorEntry>,
 ): result<unit> => {
   let error = ref(None)
 
-  Array.forEachWithIndex(values, (value, index) =>
+  Array.forEach(entries, entry =>
     switch error.contents {
     | Some(_) => ()
     | None =>
-      let constructorName = enumConstructorName(value)
+      let constructorName = enumConstructorName(entry.wireValue)
       if constructorName == reservedConstructorName {
         error.contents = Some(
           Diagnostics.make(
-            ~path=Belt.Array.concat(path, [Int.toString(index)]),
+            ~path=entry.path,
             ~message=
               "Enum constructor collision with reserved open enum constructor: " ++
               reservedConstructorName,
@@ -375,3 +387,16 @@ let validateReservedEnumConstructor = (
   | None => Ok()
   }
 }
+
+let validateReservedEnumConstructor = (
+  ~path: array<string>,
+  ~reservedConstructorName: string,
+  values: array<string>,
+): result<unit> =>
+  validateReservedConstructorEntries(
+    ~reservedConstructorName,
+    Array.mapWithIndex(values, (value, index) => {
+      path: Belt.Array.concat(path, [Int.toString(index)]),
+      wireValue: value,
+    }),
+  )
