@@ -73,6 +73,19 @@ let decodeStringArray = (~path: array<string>, json: JSON.t): result<array<strin
     )
   }
 
+let copySchemaObjectWithType = (
+  schemaObject: dict<JSON.t>,
+  nonNullType: string,
+): dict<JSON.t> => {
+  let output = Dict.make()
+
+  Dict.forEachWithKey(schemaObject, (value, key) =>
+    Dict.set(output, key, if key == "type" {JSON.String(nonNullType)} else {value})
+  )
+
+  output
+}
+
 type oneOfBranch = {
   index: int,
   path: array<string>,
@@ -476,22 +489,59 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
       if hasField(schemaObject, "enum") {
         decodeEnumSchema(~path, schemaObject)
       } else {
-        switch Dict.get(schemaObject, "type")->Belt.Option.flatMap(JSON.Decode.string) {
-        | Some("array") => decodeArraySchema(~path, schemaObject)
-        | Some("object") => decodeObjectSchema(~path, schemaObject)
-        | Some("string") => Ok(Ir.Scalar("string"))
-        | Some("integer") => Ok(Ir.Scalar("integer"))
-        | Some("number") => Ok(Ir.Scalar("number"))
-        | Some("boolean") => Ok(Ir.Scalar("boolean"))
-        | Some(kind) => unsupported(~path, ~feature="type:" ++ kind)
-        | None =>
-          if hasField(schemaObject, "properties") {
-            decodeObjectSchema(~path, schemaObject)
-          } else {
-            Error(Diagnostics.make(~path, ~message="Unsupported schema"))
+        switch Dict.get(schemaObject, "type") {
+        | Some(typeJson) =>
+          switch JSON.Decode.string(typeJson) {
+          | Some("array") => decodeArraySchema(~path, schemaObject)
+          | Some("object") => decodeObjectSchema(~path, schemaObject)
+          | Some("string") => Ok(Ir.Scalar("string"))
+          | Some("integer") => Ok(Ir.Scalar("integer"))
+          | Some("number") => Ok(Ir.Scalar("number"))
+          | Some("boolean") => Ok(Ir.Scalar("boolean"))
+          | Some(kind) => unsupported(~path, ~feature="type:" ++ kind)
+          | None =>
+            switch JSON.Decode.array(typeJson) {
+            | Some(_) => decodeNullableTypeArray(~path, schemaObject, typeJson)
+            | None => Error(Diagnostics.make(~path=at(path, "type"), ~message="Expected string"))
+            }
           }
+        | None =>
+            if hasField(schemaObject, "properties") {
+              decodeObjectSchema(~path, schemaObject)
+            } else {
+              Error(Diagnostics.make(~path, ~message="Unsupported schema"))
+            }
         }
       }
+      }
+    }
+  }
+
+and decodeNullableTypeArray = (
+  ~path: array<string>,
+  schemaObject: dict<JSON.t>,
+  typeJson: JSON.t,
+): result<Ir.schema> =>
+  switch decodeStringArray(~path=at(path, "type"), typeJson) {
+  | Error(problem) => Error(problem)
+  | Ok(typeNames) =>
+    if Array.length(typeNames) != 2 {
+      unsupported(~path=at(path, "type"), ~feature="type")
+    } else {
+      let nonNullTypes = Belt.Array.keep(typeNames, typeName => typeName != "null")
+
+      if Array.length(nonNullTypes) != 1 || !contains(typeNames, "null") {
+        unsupported(~path=at(path, "type"), ~feature="type")
+      } else {
+        let normalizedSchemaObject = copySchemaObjectWithType(
+          schemaObject,
+          Belt.Array.getOrThrow(nonNullTypes, 0),
+        )
+
+        switch decodeObject(~path, normalizedSchemaObject) {
+        | Ok(schema) => Ok(Ir.Nullable(schema))
+        | Error(problem) => Error(problem)
+        }
       }
     }
   }

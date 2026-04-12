@@ -95,6 +95,26 @@ describe("generateClient", () => {
     }
   })
 
+  it("generates clients for backend-api nullable type arrays", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+
+    try {
+      const result = runCli(resolve("fixtures/specs/backend-api.json"), targetDir)
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+      const models = readFileSync(join(targetDir, "Models.res"), "utf8")
+      const schemas = readFileSync(join(targetDir, "Schemas.res"), "utf8")
+      expect(models).toContain("type saveProfileDataHttpRequestBody = {")
+      expect(models).toContain("age: option<option<int>>")
+      expect(schemas).toContain("let saveProfileDataHttpRequestBody: t<Models.saveProfileDataHttpRequestBody> =")
+      expect(schemas).toContain("nullableAsOption(integer)")
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
   it("accepts explicit closed enum mode as a CLI option", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 

@@ -183,6 +183,34 @@ describe("decodeDocument", () => {
     })
   })
 
+  it('decodes type ["integer", "null"] as Nullable(Scalar("integer"))', () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {title: "Nullable Type Array API", version: "1.0.0"},
+      paths: {},
+      components: {
+        schemas: {
+          PersonAge: {
+            type: ["integer", "null"],
+            format: "int32",
+            minimum: 0,
+          },
+        },
+      },
+    }
+
+    let output = generate(fixture)
+
+    expect(output.ok).toBe(true)
+    expect(findSchema(output.value.schemas, "PersonAge")).toEqual({
+      name: "PersonAge",
+      schema: {
+        TAG: "Nullable",
+        _0: {TAG: "Scalar", _0: "integer"},
+      },
+    })
+  })
+
   it("rejects nullable oneOf schemas with multiple null branches", () => {
     let fixture = {
       openapi: "3.1.0",
