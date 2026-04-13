@@ -23,3 +23,7 @@ Generated clients depend on:
 - `openapi-rescript-runtime`
 - `@glennsl/rescript-fetch`
 - `sury@11.0.0-alpha.4`
+
+## Publishing
+
+See [docs/publishing-cli.md](docs/publishing-cli.md) for the manual GitHub Packages release flow for the vendored CLI package.

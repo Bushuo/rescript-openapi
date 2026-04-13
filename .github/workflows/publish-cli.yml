@@ -1,0 +1,67 @@
+name: Publish CLI to GitHub Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run workspace tests
+        run: pnpm test
+
+      - name: Prepare GitHub Packages metadata
+        working-directory: packages/openapi-rescript-cli
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REPOSITORY_NAME: ${{ github.repository }}
+        run: |
+          owner="$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          npm pkg set private=false
+          npm pkg set name="@${owner}/openapi-rescript-cli"
+          npm pkg set publishConfig.registry="https://npm.pkg.github.com"
+          npm pkg set repository.type="git"
+          npm pkg set repository.url="https://github.com/${REPOSITORY_NAME}.git"
+          node -e "const pkg = require('./package.json'); console.log(`Publishing ${pkg.name}@${pkg.version}`)"
+
+      - name: Configure npm authentication
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          owner="$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          cat > "$RUNNER_TEMP/.npmrc" <<EOF
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          @${owner}:registry=https://npm.pkg.github.com
+          always-auth=true
+          EOF
+          echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
+
+      - name: Verify publish tarball
+        run: pnpm pack --filter openapi-rescript-cli --dry-run
+
+      - name: Publish CLI package
+        working-directory: packages/openapi-rescript-cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm publish --no-git-checks

@@ -1,6 +1,6 @@
 {
   "name": "openapi-rescript-cli",
-  "private": true,
+  "private": false,
   "version": "0.0.0",
   "bin": {
     "openapi-rescript": "./bin/openapi-rescript.mjs"
