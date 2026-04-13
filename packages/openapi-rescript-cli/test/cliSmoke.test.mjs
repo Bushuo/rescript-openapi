@@ -9,6 +9,7 @@ const publishOwner = "bushuo"
 const publishRepository = "rescript-openapi"
 const stageGithubPackageScript = resolve("scripts/publish/stage-github-package.mjs")
 const publishedCorePackageName = `@${publishOwner}/openapi-rescript-core`
+const smokeTestTimeoutMs = 15_000
 
 function packStagedPackage(packageName) {
   const packageDir = resolve("packages", packageName)
@@ -64,7 +65,7 @@ function runInstalledCli(projectDir, args) {
   })
 }
 
-describe("openapi-rescript CLI smoke test", () => {
+describe("openapi-rescript CLI smoke test", {timeout: smokeTestTimeoutMs}, () => {
   it("runs through the packaged bin entrypoint", () => {
     const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
     const file = join(dir, "smoke.yaml")
