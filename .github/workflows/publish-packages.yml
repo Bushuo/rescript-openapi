@@ -1,0 +1,125 @@
+name: Publish Packages to GitHub Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RUNTIME_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-runtime
+      CORE_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-core
+      CLI_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-cli
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run workspace tests
+        run: pnpm test
+
+      - name: Assert shared package version
+        run: >
+          node scripts/publish/assert-shared-version.mjs
+          packages/openapi-rescript-runtime/package.json
+          packages/openapi-rescript-core/package.json
+          packages/openapi-rescript-cli/package.json
+
+      - name: Compute publish scope
+        id: publish-scope
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          owner="$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+
+      - name: Stage runtime package
+        env:
+          REPOSITORY_OWNER: ${{ steps.publish-scope.outputs.owner }}
+          REPOSITORY_NAME: ${{ github.repository }}
+        run: >
+          node scripts/publish/stage-github-package.mjs
+          packages/openapi-rescript-runtime
+          "$REPOSITORY_OWNER"
+          "$REPOSITORY_NAME"
+          "$RUNTIME_STAGE_DIR"
+
+      - name: Stage core package
+        env:
+          REPOSITORY_OWNER: ${{ steps.publish-scope.outputs.owner }}
+          REPOSITORY_NAME: ${{ github.repository }}
+        run: >
+          node scripts/publish/stage-github-package.mjs
+          packages/openapi-rescript-core
+          "$REPOSITORY_OWNER"
+          "$REPOSITORY_NAME"
+          "$CORE_STAGE_DIR"
+
+      - name: Stage CLI package
+        env:
+          REPOSITORY_OWNER: ${{ steps.publish-scope.outputs.owner }}
+          REPOSITORY_NAME: ${{ github.repository }}
+        run: >
+          node scripts/publish/stage-github-package.mjs
+          packages/openapi-rescript-cli
+          "$REPOSITORY_OWNER"
+          "$REPOSITORY_NAME"
+          "$CLI_STAGE_DIR"
+
+      - name: Configure npm authentication
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY_OWNER: ${{ steps.publish-scope.outputs.owner }}
+        run: |
+          cat > "$RUNNER_TEMP/.npmrc" <<EOF
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          @${REPOSITORY_OWNER}:registry=https://npm.pkg.github.com
+          always-auth=true
+          EOF
+          echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
+
+      - name: Verify runtime tarball
+        working-directory: ${{ env.RUNTIME_STAGE_DIR }}
+        run: pnpm pack --dry-run
+
+      - name: Verify core tarball
+        working-directory: ${{ env.CORE_STAGE_DIR }}
+        run: pnpm pack --dry-run
+
+      - name: Verify CLI tarball
+        working-directory: ${{ env.CLI_STAGE_DIR }}
+        run: pnpm pack --dry-run
+
+      - name: Publish runtime package
+        working-directory: ${{ env.RUNTIME_STAGE_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm publish --no-git-checks
+
+      - name: Publish core package
+        working-directory: ${{ env.CORE_STAGE_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm publish --no-git-checks
+
+      - name: Publish CLI package
+        working-directory: ${{ env.CLI_STAGE_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm publish --no-git-checks
