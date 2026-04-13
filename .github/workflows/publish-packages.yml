@@ -9,10 +9,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      RUNTIME_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-runtime
-      CORE_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-core
-      CLI_STAGE_DIR: ${{ runner.temp }}/github-packages/openapi-rescript-cli
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -48,6 +44,13 @@ jobs:
         run: |
           owner="$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
           echo "owner=$owner" >> "$GITHUB_OUTPUT"
+
+      - name: Initialize stage directories
+        run: |
+          base_dir="$RUNNER_TEMP/github-packages"
+          echo "RUNTIME_STAGE_DIR=$base_dir/openapi-rescript-runtime" >> "$GITHUB_ENV"
+          echo "CORE_STAGE_DIR=$base_dir/openapi-rescript-core" >> "$GITHUB_ENV"
+          echo "CLI_STAGE_DIR=$base_dir/openapi-rescript-cli" >> "$GITHUB_ENV"
 
       - name: Stage runtime package
         env:
@@ -95,31 +98,25 @@ jobs:
           echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
 
       - name: Verify runtime tarball
-        working-directory: ${{ env.RUNTIME_STAGE_DIR }}
-        run: pnpm pack --dry-run
+        run: pnpm --dir "$RUNTIME_STAGE_DIR" pack --dry-run
 
       - name: Verify core tarball
-        working-directory: ${{ env.CORE_STAGE_DIR }}
-        run: pnpm pack --dry-run
+        run: pnpm --dir "$CORE_STAGE_DIR" pack --dry-run
 
       - name: Verify CLI tarball
-        working-directory: ${{ env.CLI_STAGE_DIR }}
-        run: pnpm pack --dry-run
+        run: pnpm --dir "$CLI_STAGE_DIR" pack --dry-run
 
       - name: Publish runtime package
-        working-directory: ${{ env.RUNTIME_STAGE_DIR }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm publish --no-git-checks
+        run: pnpm --dir "$RUNTIME_STAGE_DIR" publish --no-git-checks
 
       - name: Publish core package
-        working-directory: ${{ env.CORE_STAGE_DIR }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm publish --no-git-checks
+        run: pnpm --dir "$CORE_STAGE_DIR" publish --no-git-checks
 
       - name: Publish CLI package
-        working-directory: ${{ env.CLI_STAGE_DIR }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm publish --no-git-checks
+        run: pnpm --dir "$CLI_STAGE_DIR" publish --no-git-checks
