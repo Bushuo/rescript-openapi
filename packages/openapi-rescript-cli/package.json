@@ -7,16 +7,14 @@
   },
   "dependencies": {
     "@rescript/runtime": "^12.2.0",
+    "openapi-rescript-core": "workspace:*",
     "yaml": "^2.8.3"
   },
   "files": [
     "bin",
-    "src",
-    "vendor"
+    "src"
   ],
   "scripts": {
-    "prepack": "node -e \"const {cpSync, mkdirSync, rmSync} = require('node:fs'); const {dirname, join} = require('node:path'); const cwd = process.cwd(); const source = join(cwd, '../openapi-rescript-core/src'); const target = join(cwd, 'vendor/openapi-rescript-core/src'); rmSync(join(cwd, 'vendor'), {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true}); cpSync(source, target, {recursive: true});\"",
-    "postpack": "node -e \"const {rmSync} = require('node:fs'); const {join} = require('node:path'); rmSync(join(process.cwd(), 'vendor'), {recursive: true, force: true});\"",
     "test": "cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-cli/test/*.test.mjs",
     "check": "node -e \"console.log('openapi-rescript-cli check placeholder')\""
   }
