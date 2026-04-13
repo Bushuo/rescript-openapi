@@ -10,6 +10,14 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"))
 }
 
+function readPackageSnapshot(packageDir) {
+  return {
+    manifest: readFileSync(join(packageDir, "package.json"), "utf8"),
+    readme: readFileSync(join(packageDir, "README.md"), "utf8"),
+    indexJs: readFileSync(join(packageDir, "src", "index.js"), "utf8"),
+  }
+}
+
 function writePackageFixture(rootDir, packageName, manifestExtras = {}) {
   const packageDir = join(rootDir, packageName)
 
@@ -207,6 +215,54 @@ describe("stage-github-package", () => {
       expect(readFileSync(join(outputDir, "src", "CliArgs.bs.js"), "utf8")).toContain(
         'require("@bushuo/openapi-rescript-core/src/OpenapiGenerator.bs.js")'
       )
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rejects an output directory that is the same as the source directory before mutating files", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const runtimeDir = writePackageFixture(rootDir, "openapi-rescript-runtime")
+      const sourceSnapshot = readPackageSnapshot(runtimeDir)
+
+      const result = runStageGithubPackage({
+        packageDir: runtimeDir,
+        owner: "bushuo",
+        repository: "rescript-openapi",
+        outputDir: runtimeDir,
+      })
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toContain("Output directory must not overlap source directory")
+      expect(readPackageSnapshot(runtimeDir)).toEqual(sourceSnapshot)
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rejects an output directory nested under the source directory before creating staged files", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const runtimeDir = writePackageFixture(rootDir, "openapi-rescript-runtime")
+      const outputDir = join(runtimeDir, "staged")
+      const sourceSnapshot = readPackageSnapshot(runtimeDir)
+
+      const result = runStageGithubPackage({
+        packageDir: runtimeDir,
+        owner: "bushuo",
+        repository: "rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toContain("Output directory must not overlap source directory")
+      expect(existsSync(outputDir)).toBe(false)
+      expect(readPackageSnapshot(runtimeDir)).toEqual(sourceSnapshot)
     } finally {
       rmSync(rootDir, {recursive: true, force: true})
     }

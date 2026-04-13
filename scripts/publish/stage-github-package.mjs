@@ -1,5 +1,5 @@
 import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
-import {extname, join, resolve} from "node:path"
+import {extname, isAbsolute, join, relative, resolve, sep} from "node:path"
 
 const LOCAL_PACKAGE_NAMES = new Set([
   "openapi-rescript-runtime",
@@ -81,6 +81,24 @@ function rewriteJsImportsInDirectory(owner, directoryPath) {
   }
 }
 
+function isNestedPath(parentPath, childPath) {
+  const relativePath = relative(parentPath, childPath)
+
+  return (
+    relativePath !== "" &&
+    relativePath !== "." &&
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativePath)
+  )
+}
+
+function assertPathsDoNotOverlap(packageDir, outputDir) {
+  if (packageDir === outputDir || isNestedPath(packageDir, outputDir) || isNestedPath(outputDir, packageDir)) {
+    throw new Error(`Output directory must not overlap source directory: ${outputDir}`)
+  }
+}
+
 function stagePackage(packageDir, outputDir) {
   rmSync(outputDir, {recursive: true, force: true})
   mkdirSync(outputDir, {recursive: true})
@@ -98,6 +116,7 @@ function main(args) {
   const [packageDirArg, owner, repository, outputDirArg] = args
   const packageDir = resolve(packageDirArg)
   const outputDir = resolve(outputDirArg)
+  assertPathsDoNotOverlap(packageDir, outputDir)
   const manifestPath = join(packageDir, "package.json")
   const stagedManifestPath = join(outputDir, "package.json")
   const manifest = readJson(manifestPath)
