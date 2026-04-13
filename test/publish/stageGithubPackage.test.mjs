@@ -181,6 +181,49 @@ describe("stage-github-package", () => {
     }
   })
 
+  it("removes staged pack-time hooks without stripping unrelated scripts", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const cliDir = writePackageFixture(rootDir, "openapi-rescript-cli", {
+        scripts: {
+          prepack: "node scripts/vendor.mjs",
+          postpack: "node scripts/cleanup.mjs",
+          test: "vitest run",
+          check: "tsc --noEmit",
+        },
+      })
+      const outputDir = join(rootDir, "staged-cli")
+
+      const result = runStageGithubPackage({
+        packageDir: cliDir,
+        owner: "bushuo",
+        repository: "Bushuo/rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+
+      const sourceManifest = readJson(join(cliDir, "package.json"))
+      const stagedManifest = readJson(join(outputDir, "package.json"))
+
+      expect(sourceManifest.scripts).toEqual({
+        prepack: "node scripts/vendor.mjs",
+        postpack: "node scripts/cleanup.mjs",
+        test: "vitest run",
+        check: "tsc --noEmit",
+      })
+      expect(stagedManifest.scripts).toEqual({
+        test: "vitest run",
+        check: "tsc --noEmit",
+      })
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
+
   it("rewrites copied js imports from local package names to scoped publish names", () => {
     const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
 

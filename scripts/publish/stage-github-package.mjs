@@ -36,6 +36,16 @@ function rewriteDependencyMap(owner, packageVersion, dependencies) {
   )
 }
 
+function rewriteScripts(scripts) {
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts)) {
+    return scripts
+  }
+
+  return Object.fromEntries(
+    Object.entries(scripts).filter(([scriptName]) => scriptName !== "prepack" && scriptName !== "postpack")
+  )
+}
+
 function rewriteManifest(manifest, owner, repository) {
   const repositorySlug = toRepositorySlug(owner, repository)
 
@@ -51,6 +61,7 @@ function rewriteManifest(manifest, owner, repository) {
       type: "git",
       url: `git+https://github.com/${repositorySlug}.git`,
     },
+    scripts: rewriteScripts(manifest.scripts),
     dependencies: rewriteDependencyMap(owner, manifest.version, manifest.dependencies),
     devDependencies: rewriteDependencyMap(owner, manifest.version, manifest.devDependencies),
     peerDependencies: rewriteDependencyMap(owner, manifest.version, manifest.peerDependencies),
