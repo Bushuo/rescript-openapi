@@ -64,11 +64,13 @@ pnpm test -- --runInBand
 
 ## Generated Client Dependencies
 
-Generated clients import the shared runtime package and its schema/HTTP dependencies:
+Generated clients import the shared runtime package and its schema/HTTP dependencies. In a consuming project, install the published GitHub Packages runtime:
 
-- `openapi-rescript-runtime`
+- `@bushuo/openapi-rescript-runtime`
 - `@glennsl/rescript-fetch`
 - `sury@11.0.0-alpha.4`
+
+Inside this repository, the corresponding workspace package is still named `openapi-rescript-runtime`.
 
 ## Supported Subset
 

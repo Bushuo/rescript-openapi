@@ -20,10 +20,10 @@ node packages/openapi-rescript-cli/bin/openapi-rescript.mjs fixtures/specs/petst
 
 Generated clients depend on:
 
-- `openapi-rescript-runtime`
+- `@bushuo/openapi-rescript-runtime` (the published GitHub Packages runtime; the workspace package remains `openapi-rescript-runtime`)
 - `@glennsl/rescript-fetch`
 - `sury@11.0.0-alpha.4`
 
 ## Publishing
 
-See [docs/publishing-cli.md](docs/publishing-cli.md) for the manual GitHub Packages release flow for the vendored CLI package.
+See [docs/publishing-cli.md](docs/publishing-cli.md) for the staged GitHub Packages release flow for `@bushuo/openapi-rescript-runtime`, `@bushuo/openapi-rescript-core`, and `@bushuo/openapi-rescript-cli`.
