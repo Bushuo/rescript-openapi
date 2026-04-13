@@ -108,4 +108,24 @@ describe("assert-shared-version", () => {
       rmSync(rootDir, {recursive: true, force: true})
     }
   })
+
+  it("fails with a readable error when an unexpected package manifest is supplied", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-publish-version-"))
+
+    try {
+      const runtimeManifest = writeManifest(rootDir, "openapi-rescript-runtime", "1.2.3")
+      const coreManifest = writeManifest(rootDir, "openapi-rescript-core", "1.2.3")
+      const cliManifest = writeManifest(rootDir, "openapi-rescript-cli", "1.2.3")
+      const extraManifest = writeManifest(rootDir, "openapi-rescript-extra", "1.2.3")
+
+      const result = runAssertSharedVersion([runtimeManifest, coreManifest, cliManifest, extraManifest])
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toContain("unexpected")
+      expect(result.stderr).toContain("openapi-rescript-extra")
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
 })

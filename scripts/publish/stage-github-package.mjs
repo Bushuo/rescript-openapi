@@ -1,5 +1,5 @@
 import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
-import {join, resolve} from "node:path"
+import {extname, join, resolve} from "node:path"
 
 const LOCAL_PACKAGE_NAMES = new Set([
   "openapi-rescript-runtime",
@@ -58,6 +58,29 @@ function rewriteManifest(manifest, owner, repository) {
   }
 }
 
+function rewriteJsImportsInDirectory(owner, directoryPath) {
+  for (const entry of readdirSync(directoryPath, {withFileTypes: true})) {
+    const entryPath = join(directoryPath, entry.name)
+
+    if (entry.isDirectory()) {
+      rewriteJsImportsInDirectory(owner, entryPath)
+      continue
+    }
+
+    if (!entry.isFile() || ![".js", ".cjs", ".mjs"].includes(extname(entry.name))) {
+      continue
+    }
+
+    let fileContents = readFileSync(entryPath, "utf8")
+
+    for (const packageName of LOCAL_PACKAGE_NAMES) {
+      fileContents = fileContents.replaceAll(packageName, toPublishedName(owner, packageName))
+    }
+
+    writeFileSync(entryPath, fileContents)
+  }
+}
+
 function stagePackage(packageDir, outputDir) {
   rmSync(outputDir, {recursive: true, force: true})
   mkdirSync(outputDir, {recursive: true})
@@ -81,6 +104,7 @@ function main(args) {
 
   stagePackage(packageDir, outputDir)
   writeJson(stagedManifestPath, rewriteManifest(manifest, owner, repository))
+  rewriteJsImportsInDirectory(owner, outputDir)
 }
 
 try {

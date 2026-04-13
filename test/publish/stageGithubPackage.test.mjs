@@ -172,4 +172,43 @@ describe("stage-github-package", () => {
       rmSync(rootDir, {recursive: true, force: true})
     }
   })
+
+  it("rewrites copied js imports from local package names to scoped publish names", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const cliDir = writePackageFixture(rootDir, "openapi-rescript-cli", {
+        dependencies: {
+          "openapi-rescript-core": "workspace:*",
+        },
+      })
+      const sourceJsPath = join(cliDir, "src", "CliArgs.bs.js")
+      const outputDir = join(rootDir, "staged-cli")
+
+      writeFileSync(
+        sourceJsPath,
+        'const OpenapiGenerator = require("openapi-rescript-core/src/OpenapiGenerator.bs.js")\n'
+      )
+
+      const result = runStageGithubPackage({
+        packageDir: cliDir,
+        owner: "bushuo",
+        repository: "Bushuo/rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+
+      expect(readFileSync(sourceJsPath, "utf8")).toContain(
+        'require("openapi-rescript-core/src/OpenapiGenerator.bs.js")'
+      )
+      expect(readFileSync(join(outputDir, "src", "CliArgs.bs.js"), "utf8")).toContain(
+        'require("@bushuo/openapi-rescript-core/src/OpenapiGenerator.bs.js")'
+      )
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
 })
