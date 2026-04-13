@@ -19,6 +19,10 @@ function toPublishedName(owner, packageName) {
   return `@${owner}/${packageName}`
 }
 
+function toRepositorySlug(owner, repository) {
+  return repository.includes("/") ? repository : `${owner}/${repository}`
+}
+
 function rewriteDependencyMap(owner, packageVersion, dependencies) {
   if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
     return dependencies
@@ -33,6 +37,8 @@ function rewriteDependencyMap(owner, packageVersion, dependencies) {
 }
 
 function rewriteManifest(manifest, owner, repository) {
+  const repositorySlug = toRepositorySlug(owner, repository)
+
   return {
     ...manifest,
     name: toPublishedName(owner, manifest.name),
@@ -43,7 +49,7 @@ function rewriteManifest(manifest, owner, repository) {
     },
     repository: {
       type: "git",
-      url: `git+https://github.com/${owner}/${repository}.git`,
+      url: `git+https://github.com/${repositorySlug}.git`,
     },
     dependencies: rewriteDependencyMap(owner, manifest.version, manifest.dependencies),
     devDependencies: rewriteDependencyMap(owner, manifest.version, manifest.devDependencies),

@@ -143,4 +143,33 @@ describe("stage-github-package", () => {
       rmSync(rootDir, {recursive: true, force: true})
     }
   })
+
+  it("uses an explicit owner/repository slug without prepending the owner again", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const runtimeDir = writePackageFixture(rootDir, "openapi-rescript-runtime")
+      const outputDir = join(rootDir, "staged-runtime")
+
+      const result = runStageGithubPackage({
+        packageDir: runtimeDir,
+        owner: "bushuo",
+        repository: "Bushuo/rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+
+      const stagedManifest = readJson(join(outputDir, "package.json"))
+
+      expect(stagedManifest.repository).toEqual({
+        type: "git",
+        url: "git+https://github.com/Bushuo/rescript-openapi.git",
+      })
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
 })

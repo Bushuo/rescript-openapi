@@ -76,4 +76,36 @@ describe("assert-shared-version", () => {
       rmSync(rootDir, {recursive: true, force: true})
     }
   })
+
+  it("fails when the required three-package manifest set is missing or duplicated", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-publish-version-"))
+
+    try {
+      const runtimeManifest = writeManifest(rootDir, "openapi-rescript-runtime", "1.2.3")
+      const duplicateRuntimeManifest = writeManifest(rootDir, "openapi-rescript-runtime-copy", "1.2.3")
+      const coreManifest = writeManifest(rootDir, "openapi-rescript-core", "1.2.3")
+      writeFileSync(
+        duplicateRuntimeManifest,
+        JSON.stringify(
+          {
+            name: "openapi-rescript-runtime",
+            version: "1.2.3",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = runAssertSharedVersion([runtimeManifest, duplicateRuntimeManifest, coreManifest])
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toContain("openapi-rescript-cli")
+      expect(result.stderr).toContain("missing")
+      expect(result.stderr).toContain("openapi-rescript-runtime")
+      expect(result.stderr).toContain("duplicate")
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
 })
