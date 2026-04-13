@@ -6,6 +6,10 @@
     "test": "pnpm --dir ../.. exec rescript build packages/openapi-rescript-core && cd ../.. && sh -c 'if [ -n \"$1\" ]; then vitest run --passWithNoTests packages/openapi-rescript-core/test/$1.test.mjs; else vitest run --passWithNoTests packages/openapi-rescript-core/test/*.test.mjs; fi' --",
     "check": "node -e \"console.log('openapi-rescript-core check placeholder')\""
   },
+  "files": [
+    "src",
+    "rescript.json"
+  ],
   "dependencies": {
     "@rescript/runtime": "^12.2.0"
   }
