@@ -19,7 +19,7 @@ function toPublishedName(owner, packageName) {
   return `@${owner}/${packageName}`
 }
 
-function rewriteDependencyMap(owner, dependencies) {
+function rewriteDependencyMap(owner, packageVersion, dependencies) {
   if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) {
     return dependencies
   }
@@ -27,7 +27,7 @@ function rewriteDependencyMap(owner, dependencies) {
   return Object.fromEntries(
     Object.entries(dependencies).map(([dependencyName, version]) => [
       LOCAL_PACKAGE_NAMES.has(dependencyName) ? toPublishedName(owner, dependencyName) : dependencyName,
-      version,
+      LOCAL_PACKAGE_NAMES.has(dependencyName) ? packageVersion : version,
     ])
   )
 }
@@ -45,10 +45,10 @@ function rewriteManifest(manifest, owner, repository) {
       type: "git",
       url: `git+https://github.com/${owner}/${repository}.git`,
     },
-    dependencies: rewriteDependencyMap(owner, manifest.dependencies),
-    devDependencies: rewriteDependencyMap(owner, manifest.devDependencies),
-    peerDependencies: rewriteDependencyMap(owner, manifest.peerDependencies),
-    optionalDependencies: rewriteDependencyMap(owner, manifest.optionalDependencies),
+    dependencies: rewriteDependencyMap(owner, manifest.version, manifest.dependencies),
+    devDependencies: rewriteDependencyMap(owner, manifest.version, manifest.devDependencies),
+    peerDependencies: rewriteDependencyMap(owner, manifest.version, manifest.peerDependencies),
+    optionalDependencies: rewriteDependencyMap(owner, manifest.version, manifest.optionalDependencies),
   }
 }
 

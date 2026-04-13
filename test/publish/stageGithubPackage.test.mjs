@@ -95,14 +95,14 @@ describe("stage-github-package", () => {
 
       const stagedCoreManifest = readJson(join(rootDir, "staged", "openapi-rescript-core", "package.json"))
       expect(stagedCoreManifest.dependencies).toEqual({
-        "@bushuo/openapi-rescript-runtime": "workspace:*",
+        "@bushuo/openapi-rescript-runtime": "1.2.3",
       })
     } finally {
       rmSync(rootDir, {recursive: true, force: true})
     }
   })
 
-  it("rewrites workspace package dependencies only inside the staged CLI manifest", () => {
+  it("rewrites staged workspace package dependencies to the committed release version", () => {
     const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
 
     try {
@@ -136,7 +136,7 @@ describe("stage-github-package", () => {
 
       expect(stagedManifest.name).toBe("@bushuo/openapi-rescript-cli")
       expect(stagedManifest.dependencies).toEqual({
-        "@bushuo/openapi-rescript-core": "workspace:*",
+        "@bushuo/openapi-rescript-core": "1.2.3",
         yaml: "^2.8.3",
       })
     } finally {
