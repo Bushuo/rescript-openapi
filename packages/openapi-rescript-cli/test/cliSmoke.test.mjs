@@ -56,6 +56,14 @@ function writeSmokeProjectManifest(projectDir, coreTarball) {
   )
 }
 
+function runInstalledCli(projectDir, args) {
+  return execFileSync("pnpm", ["exec", "openapi-rescript", ...args], {
+    cwd: projectDir,
+    encoding: "utf8",
+    env: cleanEnv(),
+  })
+}
+
 describe("openapi-rescript CLI smoke test", () => {
   it("runs through the packaged bin entrypoint", () => {
     const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
@@ -82,13 +90,7 @@ describe("openapi-rescript CLI smoke test", () => {
     try {
       writeSmokeProjectManifest(dir, corePackage.tarball)
       execFileSync("pnpm", ["add", cliPackage.tarball], {cwd: dir, stdio: "pipe"})
-      const binPath = join(dir, "node_modules", ".bin", "openapi-rescript")
-
-      const output = execFileSync(binPath, [file, dir], {
-        cwd: dir,
-        encoding: "utf8",
-        env: cleanEnv(),
-      })
+      const output = runInstalledCli(dir, [file, dir])
 
       expect(output).toBe("")
       expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Client.res", "Index.res", "Models.res", "Schemas.res"]))
@@ -126,13 +128,7 @@ describe("openapi-rescript CLI smoke test", () => {
     try {
       writeSmokeProjectManifest(dir, corePackage.tarball)
       execFileSync("pnpm", ["add", cliPackage.tarball], {cwd: dir, stdio: "pipe"})
-      const binPath = join(dir, "node_modules", ".bin", "openapi-rescript")
-
-      const output = execFileSync(binPath, ["--enum-mode=closed", file, dir], {
-        cwd: dir,
-        encoding: "utf8",
-        env: cleanEnv(),
-      })
+      const output = runInstalledCli(dir, ["--enum-mode=closed", file, dir])
 
       expect(output).toBe("")
       expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Client.res", "Index.res", "Models.res", "Schemas.res"]))
