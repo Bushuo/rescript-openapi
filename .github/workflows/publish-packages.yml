@@ -109,14 +109,14 @@ jobs:
       - name: Publish runtime package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --dir "$RUNTIME_STAGE_DIR" publish --no-git-checks
+        run: cd "$RUNTIME_STAGE_DIR" && pnpm publish --no-git-checks
 
       - name: Publish core package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --dir "$CORE_STAGE_DIR" publish --no-git-checks
+        run: cd "$CORE_STAGE_DIR" && pnpm publish --no-git-checks
 
       - name: Publish CLI package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --dir "$CLI_STAGE_DIR" publish --no-git-checks
+        run: cd "$CLI_STAGE_DIR" && pnpm publish --no-git-checks
