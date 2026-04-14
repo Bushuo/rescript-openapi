@@ -78,7 +78,28 @@ function writeConsumerFixture(appDir, tarballPaths) {
   writeFileSync(join(appDir, "src", "Demo.res"), "let ready = true\n")
 }
 
+function withoutNpmConfigEnv(env) {
+  return Object.fromEntries(
+    Object.entries(env).filter(([key]) => !/^npm_config_/i.test(key))
+  )
+}
+
 describe("published package install", () => {
+  it("drops inherited npm config env vars before invoking npm", () => {
+    expect(
+      withoutNpmConfigEnv({
+        PATH: "/usr/bin",
+        HOME: "/tmp/home",
+        NPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "1",
+        npm_config_npm_globalconfig: "/tmp/npmrc",
+        NPM_CONFIG__JSR_REGISTRY: "https://jsr.invalid",
+      })
+    ).toEqual({
+      PATH: "/usr/bin",
+      HOME: "/tmp/home",
+    })
+  })
+
   it(
     "stages, packs, installs, generates, and compiles a consumer app",
     () => {
@@ -113,7 +134,10 @@ describe("published package install", () => {
           cli: cliPack.tarballPath,
         })
 
-        const installResult = run("npm", ["install"], {cwd: appDir})
+        const installResult = run("npm", ["install"], {
+          cwd: appDir,
+          env: withoutNpmConfigEnv(process.env),
+        })
         expect(installResult.exitCode).toBe(0)
         expect(installResult.stderr).toBe("")
 
