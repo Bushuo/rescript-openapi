@@ -28,11 +28,36 @@ let renderEnum = (~name: string, ~enumMode: Ir.enumMode, values: array<string>):
   ])
 }
 
+let renderRecordType = (~name: string, fields: array<Ir.objectField>): array<string> => {
+  let quoteLabels = Printer.shouldQuoteRecordLabels(Array.map(fields, field => field.name))
+
+  Belt.Array.concatMany([
+    ["type " ++ Printer.typeName(name) ++ " = {"],
+    Array.map(fields, field => renderField(~quoteLabels, field)),
+    ["}"],
+  ])
+}
+
+let unionPayloadTypeName = (~unionName: string, ~tag: string): string =>
+  unionName ++ Naming.enumConstructorName(tag)
+
 let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => {
+  let payloadTypeBlocks = ref([])
+
   let constructorLines = Array.map(cases, case_ =>
     switch case_.payload {
     | Ir.Object(fields) if Array.length(fields) == 0 =>
       Printer.indentLine(~level=1, "| " ++ Printer.enumConstructor(case_.tag))
+    | Ir.Object(fields) =>
+      let payloadTypeName = unionPayloadTypeName(~unionName=name, ~tag=case_.tag)
+      payloadTypeBlocks.contents = Belt.Array.concat(
+        payloadTypeBlocks.contents,
+        [renderRecordType(~name=payloadTypeName, fields)],
+      )
+      Printer.indentLine(
+        ~level=1,
+        "| " ++ Printer.enumConstructor(case_.tag) ++ "(" ++ Printer.typeName(payloadTypeName) ++ ")",
+      )
     | _ =>
       Printer.indentLine(
         ~level=1,
@@ -41,19 +66,25 @@ let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => 
     }
   )
 
-  Belt.Array.concat(["type " ++ Printer.typeName(name) ++ " ="], constructorLines)
+  let unionLines = Belt.Array.concat(["type " ++ Printer.typeName(name) ++ " ="], constructorLines)
+
+  if Array.length(payloadTypeBlocks.contents) == 0 {
+    unionLines
+  } else {
+    let payloadLines = Belt.Array.joinWith(
+      Array.map(payloadTypeBlocks.contents, lines => Belt.Array.joinWith(lines, "\n", line => line)),
+      "\n\n",
+      block => block,
+    )->String.split("\n")
+
+    Belt.Array.concatMany([payloadLines, [""], unionLines])
+  }
 }
 
 let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
-    let quoteLabels = Printer.shouldQuoteRecordLabels(Array.map(fields, field => field.name))
-
-    Belt.Array.concatMany([
-      ["type " ++ Printer.typeName(schema.name) ++ " = {"],
-      Array.map(fields, field => renderField(~quoteLabels, field)),
-      ["}"],
-    ])
+    renderRecordType(~name=schema.name, fields)
   | Ir.StringEnum({values, _}) => renderEnum(~name=schema.name, ~enumMode, values)
   | Ir.DiscriminatedUnion({cases, _}) => renderUnion(~name=schema.name, cases)
   | Ir.Nullable(Ir.DiscriminatedUnion({cases, _})) =>
