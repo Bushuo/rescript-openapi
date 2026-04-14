@@ -1,4 +1,4 @@
-import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
 import {extname, isAbsolute, join, relative, resolve, sep} from "node:path"
 
 const LOCAL_PACKAGE_NAMES = new Set([
@@ -44,6 +44,22 @@ function rewriteScripts(scripts) {
   return Object.fromEntries(
     Object.entries(scripts).filter(([scriptName]) => scriptName !== "prepack" && scriptName !== "postpack")
   )
+}
+
+function rewriteRescriptConfig(owner, config) {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return config
+  }
+
+  return {
+    ...config,
+    name: LOCAL_PACKAGE_NAMES.has(config.name) ? toPublishedName(owner, config.name) : config.name,
+    dependencies: Array.isArray(config.dependencies)
+      ? config.dependencies.map((dependencyName) =>
+          LOCAL_PACKAGE_NAMES.has(dependencyName) ? toPublishedName(owner, dependencyName) : dependencyName
+        )
+      : config.dependencies,
+  }
 }
 
 function rewriteManifest(manifest, owner, repository) {
@@ -134,6 +150,10 @@ function main(args) {
 
   stagePackage(packageDir, outputDir)
   writeJson(stagedManifestPath, rewriteManifest(manifest, owner, repository))
+  const stagedRescriptConfigPath = join(outputDir, "rescript.json")
+  if (existsSync(stagedRescriptConfigPath)) {
+    writeJson(stagedRescriptConfigPath, rewriteRescriptConfig(owner, readJson(stagedRescriptConfigPath)))
+  }
   rewriteJsImportsInDirectory(owner, outputDir)
 }
 

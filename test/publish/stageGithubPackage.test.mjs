@@ -41,6 +41,10 @@ function writePackageFixture(rootDir, packageName, manifestExtras = {}) {
   return packageDir
 }
 
+function writeRescriptConfig(packageDir, config) {
+  writeFileSync(join(packageDir, "rescript.json"), `${JSON.stringify(config, null, 2)}\n`)
+}
+
 function runStageGithubPackage({packageDir, owner, repository, outputDir}) {
   const result = spawnSync("node", [scriptPath, packageDir, owner, repository, outputDir], {
     encoding: "utf8",
@@ -146,6 +150,48 @@ describe("stage-github-package", () => {
       expect(stagedManifest.dependencies).toEqual({
         "@bushuo/openapi-rescript-core": "1.2.3",
         yaml: "^2.8.3",
+      })
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
+
+  it("rewrites rescript package names and dependencies to scoped publish names", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const cliDir = writePackageFixture(rootDir, "openapi-rescript-cli")
+      const outputDir = join(rootDir, "staged-cli")
+
+      writeRescriptConfig(cliDir, {
+        name: "openapi-rescript-cli",
+        sources: [{dir: "src", subdirs: true}],
+        dependencies: ["openapi-rescript-core"],
+      })
+
+      const result = runStageGithubPackage({
+        packageDir: cliDir,
+        owner: "bushuo",
+        repository: "rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+
+      const sourceConfig = readJson(join(cliDir, "rescript.json"))
+      const stagedConfig = readJson(join(outputDir, "rescript.json"))
+
+      expect(sourceConfig).toEqual({
+        name: "openapi-rescript-cli",
+        sources: [{dir: "src", subdirs: true}],
+        dependencies: ["openapi-rescript-core"],
+      })
+      expect(stagedConfig).toEqual({
+        name: "@bushuo/openapi-rescript-cli",
+        sources: [{dir: "src", subdirs: true}],
+        dependencies: ["@bushuo/openapi-rescript-core"],
       })
     } finally {
       rmSync(rootDir, {recursive: true, force: true})

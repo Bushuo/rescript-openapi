@@ -1,7 +1,7 @@
 {
   "name": "openapi-rescript-runtime",
   "private": true,
-  "version": "0.0.1-rc.1",
+  "version": "0.0.1-rc.2",
   "scripts": {
     "test": "pnpm --dir ../.. exec rescript build packages/openapi-rescript-runtime && cd ../.. && vitest run --passWithNoTests packages/openapi-rescript-runtime/test/runtime.test.mjs",
     "check": "pnpm run test"
