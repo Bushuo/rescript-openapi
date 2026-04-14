@@ -245,6 +245,66 @@ describe("codegen", () => {
     expect(schemas.indexOf("let pregnancyStatusDto")).toBeLessThan(schemas.indexOf("let gender"))
   })
 
+  it("reuses component enum refs inside component object schemas", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Component Ref API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/profile": {
+          get: {
+            operationId: "getProfile",
+            responses: {
+              200: {
+                description: "ok",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/GetProfileHttpResponseBody"},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          AlcoholHabitsDto: {
+            type: "string",
+            enum: ["None", "Occasional"],
+          },
+          GetProfileHttpResponseBody: {
+            type: "object",
+            properties: {
+              alcoholHabits: {
+                oneOf: [{type: "null"}, {$ref: "#/components/schemas/AlcoholHabitsDto"}],
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(fixture)
+    let models = generatedFile(output, "Models.res")
+    let schemas = generatedFile(output, "Schemas.res")
+    let defaultModule = generatedFile(output, "Default_.res")
+
+    expect(output.ok).toBe(true)
+    expect(models).toContain("type alcoholHabitsDto =")
+    expect(models).not.toContain("type getProfileHttpResponseBodyAlcoholHabits =")
+    expect(models).toContain("alcoholHabits: option<option<alcoholHabitsDto>>")
+    expect(schemas).toContain("let alcoholHabitsDto: t<Models.alcoholHabitsDto> = stringMapped(")
+    expect(schemas).toContain(
+      'field(~name="alcoholHabits", ~required=false, nullableAsOption(alcoholHabitsDto))',
+    )
+    expect(defaultModule).toContain(
+      "): promise<result<Models.getProfileHttpResponseBody, Client.operationError>> =>",
+    )
+  })
+
   it("rejects open enums when a declared value normalizes to the reserved Unknown constructor", () => {
     let reservedUnknownEnum = {
       openapi: "3.1.0",

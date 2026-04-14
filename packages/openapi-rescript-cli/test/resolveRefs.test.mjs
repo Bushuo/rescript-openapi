@@ -125,4 +125,75 @@ describe("resolveRefs", () => {
       rmSync(dir, {recursive: true, force: true})
     }
   })
+
+  it("preserves same-document component schema refs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "openapi-rescript-cli-"))
+    const file = join(dir, "component-refs.json")
+
+    writeFileSync(
+      file,
+      JSON.stringify({
+        openapi: "3.1.0",
+        info: {
+          title: "Component Ref API",
+          version: "1.0.0",
+        },
+        paths: {
+          "/profile": {
+            get: {
+              operationId: "getProfile",
+              responses: {
+                200: {
+                  description: "ok",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        $ref: "#/components/schemas/GetProfileHttpResponseBody",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        components: {
+          schemas: {
+            AlcoholHabitsDto: {
+              type: "string",
+              enum: ["None", "Occasional"],
+            },
+            GetProfileHttpResponseBody: {
+              type: "object",
+              properties: {
+                alcoholHabits: {
+                  oneOf: [
+                    {type: "null"},
+                    {$ref: "#/components/schemas/AlcoholHabitsDto"},
+                  ],
+                },
+              },
+            },
+          },
+        },
+      }),
+    )
+
+    try {
+      const result = await resolveRefs(file)
+
+      expect(result.paths["/profile"].get.responses["200"].content["application/json"].schema).toEqual(
+        {
+          $ref: "#/components/schemas/GetProfileHttpResponseBody",
+        },
+      )
+      expect(
+        result.components.schemas.GetProfileHttpResponseBody.properties.alcoholHabits.oneOf[1],
+      ).toEqual({
+        $ref: "#/components/schemas/AlcoholHabitsDto",
+      })
+    } finally {
+      rmSync(dir, {recursive: true, force: true})
+    }
+  })
 })

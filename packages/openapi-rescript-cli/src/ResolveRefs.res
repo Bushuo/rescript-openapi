@@ -42,12 +42,20 @@ let splitRefTuple = ref => {
   }
 }
 
+let normalizeFragment = fragment =>
+  fragment->String.startsWith("/") ? fragment : `/${fragment}`
+
+let shouldPreserveComponentSchemaRef = ref => {
+  let (fileRef, fragment) = splitRefTuple(ref)
+  String.isEmpty(fileRef) && normalizeFragment(fragment)->String.startsWith("/components/schemas/")
+}
+
 let resolvePointer = (document, fragment): JSON.t => {
   // Return the whole document for empty or root fragments
   if String.isEmpty(fragment) || fragment == "/" {
     document
   } else {
-    let pointer = fragment->String.startsWith("/") ? fragment : `/${fragment}`
+    let pointer = normalizeFragment(fragment)
     let tokens =
       pointer
       ->String.split("/")
@@ -112,7 +120,10 @@ and resolveNode = async (value: JSON.t, currentFilePath, cache, ancestry): JSON.
     )
   | Object(obj) =>
     switch obj->Dict.get("$ref") {
-    | Some(String(ref)) => {
+    | Some(String(ref)) =>
+      if shouldPreserveComponentSchemaRef(ref) {
+        Object(obj)
+      } else {
         // replace $ref with the resolved value
         obj->Dict.delete("$ref")
         let resolved = await resolveReference(ref, currentFilePath, cache, ancestry)
