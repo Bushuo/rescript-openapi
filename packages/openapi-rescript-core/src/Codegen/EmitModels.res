@@ -75,8 +75,9 @@ let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<strin
 
 let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {
   let definitions = ref([])
+  let orderedSchemas = SchemaOrder.orderSchemas(document.schemas)
 
-  Array.forEachWithIndex(document.schemas, (schema, index) => {
+  Array.forEachWithIndex(orderedSchemas, (schema, index) => {
     if index > 0 {
       definitions.contents = Belt.Array.concat(definitions.contents, [""])
     }

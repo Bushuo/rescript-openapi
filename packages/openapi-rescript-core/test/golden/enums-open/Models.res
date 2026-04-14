@@ -21,14 +21,14 @@ type createSessionRequestState =
   | Active
   | Unknown(string)
 
-type session = {
-  id: string,
-  state: sessionState,
-  visibility: sessionVisibility,
-}
-
 type sessionState =
   | Draft
   | Active
   | Archived
   | Unknown(string)
+
+type session = {
+  id: string,
+  state: sessionState,
+  visibility: sessionVisibility,
+}

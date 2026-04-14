@@ -154,11 +154,19 @@ describe("codegen", () => {
 
     let openOutput = generateWithOptions(outOfOrderSchemaFixture, {enumMode: "open"})
     let closedOutput = generateWithOptions(outOfOrderSchemaFixture, {enumMode: "closed"})
+    let openModels = generatedFile(openOutput, "Models.res")
+    let closedModels = generatedFile(closedOutput, "Models.res")
     let openSchemas = generatedFile(openOutput, "Schemas.res")
     let closedSchemas = generatedFile(closedOutput, "Schemas.res")
 
     expect(openOutput.ok).toBe(true)
     expect(closedOutput.ok).toBe(true)
+    expect(openModels.indexOf("type status =")).toBeLessThan(
+      openModels.indexOf("type thing = {"),
+    )
+    expect(closedModels.indexOf("type status =")).toBeLessThan(
+      closedModels.indexOf("type thing = {"),
+    )
     expect(openSchemas.indexOf("let status: t<Models.status> = stringMapped(")).toBeLessThan(
       openSchemas.indexOf("let thing: t<Models.thing> = object_(["),
     )
