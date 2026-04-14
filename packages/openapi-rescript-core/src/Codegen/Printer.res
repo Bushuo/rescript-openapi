@@ -284,7 +284,7 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
       | Ir.Object(fields) if Array.length(fields) == 0 =>
         "value => switch value { | " ++
         enumConstructor(~qualifiedModels=true, case_.tag) ++
-        " => Some(Obj.magic({})) | _ => None }"
+        " => Some(Obj.magic(dict{})) | _ => None }"
       | _ =>
         "value => switch value { | " ++
         enumConstructor(~qualifiedModels=true, case_.tag) ++

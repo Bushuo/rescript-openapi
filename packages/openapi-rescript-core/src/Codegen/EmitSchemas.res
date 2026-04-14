@@ -20,17 +20,23 @@ let renderEnumSchema = (
   ~enumMode: Ir.enumMode,
   values: array<string>,
 ): array<string> => {
+  let annotateEnumValue = valueExpr =>
+    "(" ++ valueExpr ++ ": " ++ Printer.enumTypeRef(~qualifiedModels=true, name) ++ ")"
+
   let decodeLines = Belt.Array.concat(
     Array.map(values, value =>
       "    | " ++
       Printer.quote(value) ++
       " => Ok(" ++
-      Printer.enumConstructor(~qualifiedModels=true, value) ++
+      annotateEnumValue(Printer.enumConstructor(~qualifiedModels=true, value)) ++
       ")"
     ),
     [
       switch enumMode {
-      | Ir.Open => "    | value => Ok(" ++ Printer.enumUnknown(~qualifiedModels=true, "value") ++ ")"
+      | Ir.Open =>
+        "    | value => Ok(" ++
+        annotateEnumValue(Printer.enumUnknown(~qualifiedModels=true, "value")) ++
+        ")"
       | Ir.Closed => "    | value => " ++ Printer.enumDecodeErrorExpr("value", values)
       },
     ],

@@ -313,6 +313,92 @@ describe("codegen", () => {
     )
   })
 
+  it("annotates enum decode constructors when multiple generated variants share constructor names", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Shared Enum Constructors API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          AlcoholHabitsDto: {
+            type: "string",
+            enum: ["None", "Occasional", "Moderate", "Frequent"],
+          },
+          CaffeineHabitsDto: {
+            type: "string",
+            enum: ["None", "Occasional", "Daily"],
+          },
+        },
+      },
+      paths: {},
+    }
+
+    let output = generateWithOptions(fixture, {enumMode: "closed"})
+    let schemas = generatedFile(output, "Schemas.res")
+
+    expect(output.ok).toBe(true)
+    expect(schemas).toContain('| "None" => Ok((Models.None: Models.alcoholHabitsDto))')
+    expect(schemas).toContain(
+      '| "Occasional" => Ok((Models.Occasional: Models.alcoholHabitsDto))',
+    )
+    expect(schemas).toContain('| "None" => Ok((Models.None: Models.caffeineHabitsDto))')
+  })
+
+  it("uses dict{} for empty discriminated-union payload unwraps", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Empty Union Payload API",
+        version: "1.0.0",
+      },
+      components: {
+        schemas: {
+          PregnancyStatusDto: {
+            type: "string",
+            enum: ["Pregnant", "NotPregnant"],
+          },
+          SexDto: {
+            oneOf: [
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {type: "string", enum: ["Male"]},
+                },
+              },
+              {
+                type: "object",
+                required: ["kind", "value"],
+                properties: {
+                  kind: {const: "Female"},
+                  value: {$ref: "#/components/schemas/PregnancyStatusDto"},
+                },
+              },
+              {
+                type: "object",
+                required: ["kind"],
+                properties: {
+                  kind: {const: "PreferNotToSay"},
+                },
+              },
+            ],
+          },
+        },
+      },
+      paths: {},
+    }
+
+    let output = generate(fixture)
+    let schemas = generatedFile(output, "Schemas.res")
+
+    expect(output.ok).toBe(true)
+    expect(schemas).not.toContain("Obj.magic({})")
+    expect(schemas).toContain("| Models.Male => Some(Obj.magic(dict{}))")
+    expect(schemas).toContain("| Models.PreferNotToSay => Some(Obj.magic(dict{}))")
+  })
+
   it("rejects open enums when a declared value normalizes to the reserved Unknown constructor", () => {
     let reservedUnknownEnum = {
       openapi: "3.1.0",
