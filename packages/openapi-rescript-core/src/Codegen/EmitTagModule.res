@@ -22,15 +22,35 @@ let effectiveSecurity = (~document: Ir.document, ~operation: Ir.operation): arra
   | None => document.security
   }
 
-let operationResultType = (operation: Ir.operation): string =>
+let operationResultTypeName = (operation: Ir.operation): string => operation.name ++ "Result"
+
+let rec renderAnonymousResultType = (~baseName: string, schema: Ir.schema): (string, array<string>) =>
+  switch schema {
+  | Ir.Object(_) =>
+    (
+      baseName,
+      ["type " ++ baseName ++ " = " ++ Printer.modelType(~qualifiedNamedRefs=true, schema)],
+    )
+  | Ir.Array(item) =>
+    let (itemType, aliasLines) = renderAnonymousResultType(~baseName=baseName ++ "Item", item)
+    ("array<" ++ itemType ++ ">", aliasLines)
+  | Ir.Nullable(inner) =>
+    let (innerType, aliasLines) = renderAnonymousResultType(~baseName=baseName ++ "Value", inner)
+    ("option<" ++ innerType ++ ">", aliasLines)
+  | _ => (Printer.modelType(~qualifiedNamedRefs=true, schema), [])
+  }
+
+let operationResultType = (operation: Ir.operation): (string, array<string>) =>
   switch Array.find(operation.responses, response => isSuccessStatus(response.statusCode)) {
-  | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
-  | Some({schema: None}) => "unit"
+  | Some({schema: Some(schema)}) =>
+    renderAnonymousResultType(~baseName=operationResultTypeName(operation), schema)
+  | Some({schema: None}) => ("unit", [])
   | None =>
     switch Array.find(operation.responses, response => response.statusCode == "default") {
-    | Some({schema: Some(schema)}) => Printer.modelType(~qualifiedNamedRefs=true, schema)
-    | Some({schema: None}) => "unit"
-    | None => "unit"
+    | Some({schema: Some(schema)}) =>
+      renderAnonymousResultType(~baseName=operationResultTypeName(operation), schema)
+    | Some({schema: None}) => ("unit", [])
+    | None => ("unit", [])
     }
   }
 
@@ -177,13 +197,25 @@ let renderOperationValue = (~document: Ir.document, operation: Ir.operation): ar
   ])
 }
 
-let renderOperationFunction = (operation: Ir.operation): array<string> => [
+let renderOperationFunction = (operation: Ir.operation): array<string> => {
+  let (resultType, resultTypeAliases) = operationResultType(operation)
+
+  Belt.Array.concatMany([
+    resultTypeAliases,
+    if Array.length(resultTypeAliases) > 0 {
+      [""]
+    } else {
+      []
+    },
+    [
   "let " ++ operation.name ++ " = (",
   "  client: Client.t,",
   "  params: " ++ paramsTypeName(operation) ++ ",",
-  "): promise<result<" ++ operationResultType(operation) ++ ", Client.operationError>> =>",
+  "): promise<result<" ++ resultType ++ ", Client.operationError>> =>",
   "  Client.callJson(client, " ++ operation.name ++ "Operation, params)",
-]
+    ],
+  ])
+}
 
 let renderOperation = (~document: Ir.document, operation: Ir.operation): array<string> =>
   Belt.Array.concatMany([

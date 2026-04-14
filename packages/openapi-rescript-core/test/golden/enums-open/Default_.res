@@ -54,10 +54,12 @@ let getSessionOperation: Client.jsonOperation = {
   securitySchemes: [],
 }
 
+type getSessionResult = { id: string, state: Models.getSessionResponse200State }
+
 let getSession = (
   client: Client.t,
   params: getSessionParams,
-): promise<result<{ id: string, state: Models.getSessionResponse200State }, Client.operationError>> =>
+): promise<result<getSessionResult, Client.operationError>> =>
   Client.callJson(client, getSessionOperation, params)
 
 type createSessionParams = {

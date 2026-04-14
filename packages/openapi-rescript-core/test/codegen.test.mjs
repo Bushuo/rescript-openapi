@@ -93,6 +93,8 @@ describe("codegen", () => {
     let closedModels = generatedFile(closedOutput, "Models.res")
     let openSchemas = generatedFile(openOutput, "Schemas.res")
     let closedSchemas = generatedFile(closedOutput, "Schemas.res")
+    let openDefaultModule = generatedFile(openOutput, "Default_.res")
+    let closedDefaultModule = generatedFile(closedOutput, "Default_.res")
 
     expect(openOutput.ok).toBe(true)
     expect(closedOutput.ok).toBe(true)
@@ -119,6 +121,10 @@ describe("codegen", () => {
     )
     expect(openSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
     expect(closedSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
+    expect(openDefaultModule).toContain("type getSessionResult = { id: string, state: Models.getSessionResponse200State }")
+    expect(openDefaultModule).toContain("): promise<result<getSessionResult, Client.operationError>> =>")
+    expect(closedDefaultModule).toContain("type getSessionResult = { id: string, state: Models.getSessionResponse200State }")
+    expect(closedDefaultModule).toContain("): promise<result<getSessionResult, Client.operationError>> =>")
   })
 
   it("orders named schema definitions before sibling schemas that reference them", () => {
