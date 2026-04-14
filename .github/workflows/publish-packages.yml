@@ -37,6 +37,12 @@ jobs:
           packages/openapi-rescript-core/package.json
           packages/openapi-rescript-cli/package.json
 
+      - name: Resolve npm dist-tag
+        id: dist-tag
+        run: >
+          echo "value=$(node scripts/publish/resolve-dist-tag.mjs packages/openapi-rescript-runtime/package.json)"
+          >> "$GITHUB_OUTPUT"
+
       - name: Compute publish scope
         id: publish-scope
         env:
@@ -93,7 +99,6 @@ jobs:
           cat > "$RUNNER_TEMP/.npmrc" <<EOF
           //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
           @${REPOSITORY_OWNER}:registry=https://npm.pkg.github.com
-          always-auth=true
           EOF
           echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/.npmrc" >> "$GITHUB_ENV"
 
@@ -109,14 +114,14 @@ jobs:
       - name: Publish runtime package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cd "$RUNTIME_STAGE_DIR" && pnpm publish --no-git-checks
+        run: cd "$RUNTIME_STAGE_DIR" && pnpm publish --no-git-checks --tag "${{ steps.dist-tag.outputs.value }}"
 
       - name: Publish core package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cd "$CORE_STAGE_DIR" && pnpm publish --no-git-checks
+        run: cd "$CORE_STAGE_DIR" && pnpm publish --no-git-checks --tag "${{ steps.dist-tag.outputs.value }}"
 
       - name: Publish CLI package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cd "$CLI_STAGE_DIR" && pnpm publish --no-git-checks
+        run: cd "$CLI_STAGE_DIR" && pnpm publish --no-git-checks --tag "${{ steps.dist-tag.outputs.value }}"
