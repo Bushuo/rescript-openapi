@@ -47,7 +47,7 @@ let getSessionOperation: Client.jsonOperation = {
   responses: [
     {
       statusCode: "200",
-      schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.object_([Schemas.field(~name="id", ~required=true, Schemas.string), Schemas.field(~name="state", ~required=true, Schemas.getSessionResponse200State)]))),
+      schema: Some(Obj.magic(OpenapiRescriptRuntime.Schema.toAny(Schemas.object_([Schemas.field(~name="id", ~required=true, Schemas.string), Schemas.field(~name="state", ~required=true, Schemas.getSessionResponse200State)])))),
     },
   ],
   security: [],

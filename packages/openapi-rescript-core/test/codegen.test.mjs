@@ -363,7 +363,7 @@ describe("codegen", () => {
     )
     expect(defaultSuccessModule).toContain('statusCode: "default"')
     expect(defaultSuccessModule).toContain(
-      "schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.fallbackPayload))",
+      "schema: Some(Obj.magic(OpenapiRescriptRuntime.Schema.toAny(Schemas.fallbackPayload)))",
     )
   })
 

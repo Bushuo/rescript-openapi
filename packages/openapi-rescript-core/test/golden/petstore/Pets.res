@@ -21,7 +21,7 @@ let listPetsOperation: Client.jsonOperation = {
   responses: [
     {
       statusCode: "200",
-      schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.array(Schemas.pet))),
+      schema: Some(Obj.magic(OpenapiRescriptRuntime.Schema.toAny(Schemas.array(Schemas.pet)))),
     },
   ],
   security: [["ApiKeyAuth"]],
@@ -58,7 +58,7 @@ let createPetOperation: Client.jsonOperation = {
   responses: [
     {
       statusCode: "201",
-      schema: Some(OpenapiRescriptRuntime.Schema.toAny(Schemas.pet)),
+      schema: Some(Obj.magic(OpenapiRescriptRuntime.Schema.toAny(Schemas.pet))),
     },
   ],
   security: [["ApiKeyAuth"]],

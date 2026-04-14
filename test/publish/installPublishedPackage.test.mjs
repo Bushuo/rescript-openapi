@@ -1,11 +1,12 @@
 import {spawnSync} from "node:child_process"
-import {mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync} from "node:fs"
+import {mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
 import {tmpdir} from "node:os"
 import {join, resolve} from "node:path"
 import {describe, expect, it} from "vitest"
 
 const stageScriptPath = resolve("scripts/publish/stage-github-package.mjs")
 const packageRoot = resolve(".")
+const petstoreSpecPath = resolve("fixtures/specs/petstore.yaml")
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -46,10 +47,7 @@ function packPackage(packageDir, tarballDir) {
 
 function writeConsumerFixture(appDir, tarballPaths) {
   mkdirSync(join(appDir, "src"), {recursive: true})
-  writeFileSync(
-    join(appDir, "openapi.yaml"),
-    ["openapi: 3.1.0", "info:", "  title: Minimal", "  version: 1.0.0", "paths: {}", ""].join("\n")
-  )
+  writeFileSync(join(appDir, "openapi.yaml"), readFileSync(petstoreSpecPath, "utf8"))
   writeJson(join(appDir, "package.json"), {
     name: "published-package-compile-smoke",
     private: true,

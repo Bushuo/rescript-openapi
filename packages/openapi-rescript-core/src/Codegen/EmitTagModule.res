@@ -126,8 +126,8 @@ let renderResponse = (response: Ir.response): array<string> => {
   let schemaLine = switch response.schema {
   | None => "None"
   | Some(schema) =>
-    "Some(OpenapiRescriptRuntime.Schema.toAny(" ++
-    Printer.schemaExpr(~qualified=true, schema) ++ "))"
+    "Some(Obj.magic(OpenapiRescriptRuntime.Schema.toAny(" ++
+    Printer.schemaExpr(~qualified=true, schema) ++ ")))"
   }
 
   [

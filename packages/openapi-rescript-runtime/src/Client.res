@@ -15,8 +15,6 @@ external appendSearchParam: (searchParams, string, string) => unit = "append"
 external encodeURIComponent: string => string = "encodeURIComponent"
 @val
 external btoa: string => string = "btoa"
-@val @scope("Promise")
-external resolvePromise: 'a => promise<'a> = "resolve"
 external methodFromString: string => Fetch.method = "%identity"
 external dictFromUnknown: 'a => dict<unknown> = "%identity"
 @send
@@ -46,7 +44,7 @@ type requestBody = {
 
 type response = {
   statusCode: string,
-  schema: option<Schema.any>,
+  schema: option<unknown>,
 }
 
 type securityScheme = {
@@ -327,14 +325,79 @@ let makeRequestInit = (
   | None => {method: method_, headers}
   }
 
-let callJson = (client: t, operation: jsonOperation, params: 'params): promise<
-  result<'response, OperationError.t>,
-> => {
+let finishJsonRequest: (
+  jsonOperation,
+  url,
+  Fetch.Headers.t,
+  option<Fetch.Body.t>,
+) => promise<result<'response, OperationError.t>> = async (
+  operation: jsonOperation,
+  requestUrl: url,
+  requestHeaders: Fetch.Headers.t,
+  body: option<Fetch.Body.t>,
+): result<'response, OperationError.t> => {
+  try {
+    let response = await Fetch.fetch(
+      requestUrl->toString,
+      makeRequestInit(
+        ~method_=methodFromString(operation.method->String.toUpperCase),
+        ~headers=requestHeaders,
+        ~body,
+      ),
+    )
+    let status = response->Fetch.Response.status
+    let responseText = await response->Fetch.Response.text
+
+    switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
+    | (false, _) =>
+      Error(
+        OperationError.unexpectedStatus(
+          ~operationName=operation.name,
+          ~status,
+          ~body=responseText,
+        ),
+      )
+    | (true, None) =>
+      Error(
+        OperationError.unexpectedStatus(
+          ~operationName=operation.name,
+          ~status,
+          ~body=responseText,
+        ),
+      )
+    | (true, Some({schema: None})) => Ok(Obj.magic())
+    | (true, Some({schema: Some(schema)})) =>
+      try {
+        let responseSchema: Schema.any = Obj.magic(schema)
+        Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, responseSchema)))
+      } catch {
+      | error =>
+        Error(
+          OperationError.responseDecode(
+            ~operationName=operation.name,
+            ~message=exnMessage(error),
+            ~status,
+            ~body=responseText,
+          ),
+        )
+      }
+    }
+  } catch {
+  | error =>
+    Error(OperationError.transport(~operationName=operation.name, ~message=exnMessage(error)))
+  }
+}
+
+let callJson: (t, jsonOperation, 'params) => promise<result<'response, OperationError.t>> = async (
+  client: t,
+  operation: jsonOperation,
+  params: 'params,
+): result<'response, OperationError.t> => {
   let headers = Fetch.Headers.fromArray(client.defaultHeaders)
   headers->Fetch.Headers.set("accept", "application/json")
 
   switch applyParameters(operation, params, headers) {
-  | Error(error) => resolvePromise(Error(error))
+  | Error(error) => Error(error)
   | Ok((path, queryParams)) =>
     let requestUrl = makeUrl(path, client.baseUrl)
     Array.forEach(queryParams, ((name, value)) =>
@@ -344,61 +407,8 @@ let callJson = (client: t, operation: jsonOperation, params: 'params): promise<
     applySecurity(client, operation, requestUrl, requestHeaders)
 
     switch encodeRequestBody(operation, params, requestHeaders) {
-    | Error(error) => resolvePromise(Error(error))
-    | Ok(body) =>
-      let finishRequest = async () => {
-        try {
-          let response = await Fetch.fetch(
-            requestUrl->toString,
-            makeRequestInit(
-              ~method_=methodFromString(operation.method->String.toUpperCase),
-              ~headers=requestHeaders,
-              ~body,
-            ),
-          )
-          let status = response->Fetch.Response.status
-          let responseText = await response->Fetch.Response.text
-
-          switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
-          | (false, _) =>
-            Error(
-              OperationError.unexpectedStatus(
-                ~operationName=operation.name,
-                ~status,
-                ~body=responseText,
-              ),
-            )
-          | (true, None) =>
-            Error(
-              OperationError.unexpectedStatus(
-                ~operationName=operation.name,
-                ~status,
-                ~body=responseText,
-              ),
-            )
-          | (true, Some({schema: None})) => Ok(Obj.magic())
-          | (true, Some({schema: Some(schema)})) =>
-            try {
-              Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, schema)))
-            } catch {
-            | error =>
-              Error(
-                OperationError.responseDecode(
-                  ~operationName=operation.name,
-                  ~message=exnMessage(error),
-                  ~status,
-                  ~body=responseText,
-                ),
-              )
-            }
-          }
-        } catch {
-        | error =>
-          Error(OperationError.transport(~operationName=operation.name, ~message=exnMessage(error)))
-        }
-      }
-
-      finishRequest()
+    | Error(error) => Error(error)
+    | Ok(body) => await finishJsonRequest(operation, requestUrl, requestHeaders, body)
     }
   }
 }
