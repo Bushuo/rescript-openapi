@@ -15,13 +15,12 @@ external appendSearchParam: (searchParams, string, string) => unit = "append"
 external encodeURIComponent: string => string = "encodeURIComponent"
 @val
 external btoa: string => string = "btoa"
+@val @scope("Promise")
+external resolvePromise: 'a => promise<'a> = "resolve"
 external methodFromString: string => Fetch.method = "%identity"
 external dictFromUnknown: 'a => dict<unknown> = "%identity"
 @send
 external replaceAllString: (string, string, string) => string = "replaceAll"
-@val @scope("Promise")
-external resolvePromise: 'a => promise<'a> = "resolve"
-
 type authCredential = {
   schemeName: string,
   value: string,
@@ -328,7 +327,7 @@ let makeRequestInit = (
   | None => {method: method_, headers}
   }
 
-let callJson = async (client: t, operation: jsonOperation, params: 'params): promise<
+let callJson = (client: t, operation: jsonOperation, params: 'params): promise<
   result<'response, OperationError.t>,
 > => {
   let headers = Fetch.Headers.fromArray(client.defaultHeaders)
@@ -347,46 +346,42 @@ let callJson = async (client: t, operation: jsonOperation, params: 'params): pro
     switch encodeRequestBody(operation, params, requestHeaders) {
     | Error(error) => resolvePromise(Error(error))
     | Ok(body) =>
-      try {
-        let response = await Fetch.fetch(
-          requestUrl->toString,
-          makeRequestInit(
-            ~method_=methodFromString(operation.method->String.toUpperCase),
-            ~headers=requestHeaders,
-            ~body,
-          ),
-        )
-        let status = response->Fetch.Response.status
-        let responseText = await response->Fetch.Response.text
+      let finishRequest = async () => {
+        try {
+          let response = await Fetch.fetch(
+            requestUrl->toString,
+            makeRequestInit(
+              ~method_=methodFromString(operation.method->String.toUpperCase),
+              ~headers=requestHeaders,
+              ~body,
+            ),
+          )
+          let status = response->Fetch.Response.status
+          let responseText = await response->Fetch.Response.text
 
-        switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
-        | (false, _) =>
-          resolvePromise(
+          switch (isSuccessStatus(status), findSuccessResponse(operation, status)) {
+          | (false, _) =>
             Error(
               OperationError.unexpectedStatus(
                 ~operationName=operation.name,
                 ~status,
                 ~body=responseText,
               ),
-            ),
-          )
-        | (true, None) =>
-          resolvePromise(
+            )
+          | (true, None) =>
             Error(
               OperationError.unexpectedStatus(
                 ~operationName=operation.name,
                 ~status,
                 ~body=responseText,
               ),
-            ),
-          )
-        | (true, Some({schema: None})) => resolvePromise(Ok(Obj.magic()))
-        | (true, Some({schema: Some(schema)})) =>
-          try {
-            resolvePromise(Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, schema))))
-          } catch {
-          | error =>
-            resolvePromise(
+            )
+          | (true, Some({schema: None})) => Ok(Obj.magic())
+          | (true, Some({schema: Some(schema)})) =>
+            try {
+              Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, schema)))
+            } catch {
+            | error =>
               Error(
                 OperationError.responseDecode(
                   ~operationName=operation.name,
@@ -394,18 +389,16 @@ let callJson = async (client: t, operation: jsonOperation, params: 'params): pro
                   ~status,
                   ~body=responseText,
                 ),
-              ),
-            )
+              )
+            }
           }
+        } catch {
+        | error =>
+          Error(OperationError.transport(~operationName=operation.name, ~message=exnMessage(error)))
         }
-      } catch {
-      | error =>
-        resolvePromise(
-          Error(
-            OperationError.transport(~operationName=operation.name, ~message=exnMessage(error)),
-          ),
-        )
       }
+
+      finishRequest()
     }
   }
 }

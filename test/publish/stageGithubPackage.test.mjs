@@ -198,6 +198,40 @@ describe("stage-github-package", () => {
     }
   })
 
+  it("preserves an explicit rescript namespace when staging the runtime package", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
+
+    try {
+      const runtimeDir = writePackageFixture(rootDir, "openapi-rescript-runtime")
+      const outputDir = join(rootDir, "staged-runtime")
+
+      writeRescriptConfig(runtimeDir, {
+        name: "openapi-rescript-runtime",
+        namespace: "OpenapiRescriptRuntime",
+        sources: [{dir: "src", subdirs: true}],
+      })
+
+      const result = runStageGithubPackage({
+        packageDir: runtimeDir,
+        owner: "bushuo",
+        repository: "rescript-openapi",
+        outputDir,
+      })
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+
+      expect(readJson(join(outputDir, "rescript.json"))).toEqual({
+        name: "@bushuo/openapi-rescript-runtime",
+        namespace: "OpenapiRescriptRuntime",
+        sources: [{dir: "src", subdirs: true}],
+      })
+    } finally {
+      rmSync(rootDir, {recursive: true, force: true})
+    }
+  })
+
   it("uses an explicit owner/repository slug without prepending the owner again", () => {
     const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-stage-package-"))
 

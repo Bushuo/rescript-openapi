@@ -1,5 +1,6 @@
 {
   "name": "openapi-rescript-runtime",
+  "namespace": "OpenapiRescriptRuntime",
   "sources": [
     {
       "dir": "src",
