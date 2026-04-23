@@ -150,6 +150,21 @@ describe("published package install", () => {
         expect(generateResult.stdout).toBe("")
         expect(generateResult.stderr).toBe("")
 
+        writeFileSync(join(appDir, "src", "generated", "CollectErrors.res"), [
+          "type appError = [",
+          "  | Client.operationError",
+          "  | #domain(string)",
+          "]",
+          "",
+          "let listPets = async (client: Client.t): result<array<Models.pet>, appError> => {",
+          "  switch await Pets.listPets(client, {limit: None}) {",
+          "  | Ok(pets) => Ok(pets)",
+          "  | Error(error) => Error(error)",
+          "  }",
+          "}",
+          "",
+        ].join("\n"))
+
         const buildResult = run("node", [join(appDir, "node_modules", ".bin", "rescript"), "build"], {cwd: appDir})
         expect(buildResult.exitCode).toBe(0)
         expect(buildResult.stderr).toBe("")

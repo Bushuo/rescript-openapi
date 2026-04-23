@@ -185,10 +185,11 @@ let applySecurity = (
     )
   }
 
-let applyParameters = (operation: jsonOperation, params: 'params, headers: Fetch.Headers.t): result<
-  (string, array<(string, string)>),
-  OperationError.t,
-> => {
+let applyParameters = (
+  operation: jsonOperation,
+  params: 'params,
+  headers: Fetch.Headers.t,
+): result<(string, array<(string, string)>), OperationError.row<'error>> => {
   let path = ref(operation.path)
   let queryParams = ref([])
 
@@ -227,7 +228,7 @@ let encodeRequestBody = (
   operation: jsonOperation,
   params: 'params,
   headers: Fetch.Headers.t,
-): result<option<Fetch.Body.t>, OperationError.t> =>
+): result<option<Fetch.Body.t>, OperationError.row<'error>> =>
   switch operation.requestBody {
   | None => Ok(None)
   | Some(requestBody) =>
@@ -330,12 +331,12 @@ let finishJsonRequest: (
   url,
   Fetch.Headers.t,
   option<Fetch.Body.t>,
-) => promise<result<'response, OperationError.t>> = async (
+) => promise<result<'response, OperationError.row<'error>>> = async (
   operation: jsonOperation,
   requestUrl: url,
   requestHeaders: Fetch.Headers.t,
   body: option<Fetch.Body.t>,
-): result<'response, OperationError.t> => {
+): result<'response, OperationError.row<'error>> => {
   try {
     let response = await Fetch.fetch(
       requestUrl->toString,
@@ -388,11 +389,15 @@ let finishJsonRequest: (
   }
 }
 
-let callJson: (t, jsonOperation, 'params) => promise<result<'response, OperationError.t>> = async (
+let callJson: (
+  t,
+  jsonOperation,
+  'params,
+) => promise<result<'response, OperationError.row<'error>>> = async (
   client: t,
   operation: jsonOperation,
   params: 'params,
-): result<'response, OperationError.t> => {
+): result<'response, OperationError.row<'error>> => {
   let headers = Fetch.Headers.fromArray(client.defaultHeaders)
   headers->Fetch.Headers.set("accept", "application/json")
 

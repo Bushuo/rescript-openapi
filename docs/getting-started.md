@@ -101,6 +101,32 @@ Generated clients import the shared runtime package and its schema/HTTP dependen
 
 Inside this repository, the corresponding workspace package is still named `openapi-rescript-runtime`.
 
+## Operation Errors
+
+Generated operation calls return a result whose error is a polymorphic variant row:
+
+```rescript
+promise<result<response, Client.operationErrorOpen<'error>>>
+```
+
+The closed base alias is available as `Client.operationError` so application functions can collect generated errors with domain errors:
+
+```rescript
+type appError = [
+  | Client.operationError
+  | #domain(string)
+]
+
+let loadPets = async (client: Client.t): result<array<Models.pet>, appError> => {
+  switch await Pets.listPets(client, {limit: None}) {
+  | Ok(pets) => Ok(pets)
+  | Error(error) => Error(error)
+  }
+}
+```
+
+Available generated/runtime error cases are `#transport`, `#requestEncoding`, `#unexpectedStatus`, and `#responseDecode`.
+
 ## Supported Subset
 
 V1 supports a strict subset of OpenAPI 3.1:

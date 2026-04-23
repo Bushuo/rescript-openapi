@@ -1,18 +1,20 @@
 import {beforeEach, describe, expect, it, vi} from "vitest"
 
 const loadRuntime = async () => {
-  let [Client, Schema, Scalar, S] = await Promise.all([
+  let [Client, OperationError, Schema, Scalar, S] = await Promise.all([
     import("../src/Client.bs.js"),
+    import("../src/OperationError.bs.js"),
     import("../src/Schema.bs.js"),
     import("../src/Scalar.bs.js"),
     import("../node_modules/sury/src/S.bs.js"),
   ])
 
-  return {Client, Schema, Scalar, S}
+  return {Client, OperationError, Schema, Scalar, S}
 }
 
 const ok = value => ({TAG: "Ok", _0: value})
 const error = value => ({TAG: "Error", _0: value})
+const poly = (name, value) => ({NAME: name, VAL: value})
 
 describe("openapi-rescript-runtime", () => {
   beforeEach(() => {
@@ -58,6 +60,42 @@ describe("openapi-rescript-runtime", () => {
     expect(S.reverseConvertToJsonStringOrThrow({value: "id_456"}, Uuid.schema)).toBe(
       JSON.stringify("id_456"),
     )
+  })
+
+  it("exposes operation errors as polymorphic variants", async () => {
+    let {OperationError} = await loadRuntime()
+
+    expect(OperationError.transport("listPets", "network down")).toEqual({
+      NAME: "transport",
+      VAL: {
+        operationName: "listPets",
+        message: "network down",
+      },
+    })
+    expect(OperationError.requestEncoding("createPet", "missing body")).toEqual({
+      NAME: "requestEncoding",
+      VAL: {
+        operationName: "createPet",
+        message: "missing body",
+      },
+    })
+    expect(OperationError.unexpectedStatus("listPets", 500, "oops")).toEqual({
+      NAME: "unexpectedStatus",
+      VAL: {
+        operationName: "listPets",
+        status: 500,
+        body: "oops",
+      },
+    })
+    expect(OperationError.responseDecode("listPets", "bad json", 200, "{}")).toEqual({
+      NAME: "responseDecode",
+      VAL: {
+        operationName: "listPets",
+        message: "bad json",
+        status: 200,
+        body: "{}",
+      },
+    })
   })
 
   it("decodes nullable schemas as Null.t values", async () => {
@@ -275,10 +313,9 @@ describe("openapi-rescript-runtime", () => {
     let requestFailure = await Client.callJson(client, operation, {body: {enabled: "yes"}})
     expect(requestFailure).toEqual(
       error(
-        expect.objectContaining({
-          kind: "requestEncoding",
+        poly("requestEncoding", expect.objectContaining({
           operationName: "strictOperation",
-        }),
+        })),
       ),
     )
 
@@ -286,10 +323,9 @@ describe("openapi-rescript-runtime", () => {
     let statusFailure = await Client.callJson(client, {...operation, requestBody: undefined}, {})
     expect(statusFailure).toEqual(
       error(
-        expect.objectContaining({
-          kind: "unexpectedStatus",
+        poly("unexpectedStatus", expect.objectContaining({
           status: 418,
-        }),
+        })),
       ),
     )
 
@@ -300,10 +336,9 @@ describe("openapi-rescript-runtime", () => {
     let decodeFailure = await Client.callJson(client, {...operation, requestBody: undefined}, {})
     expect(decodeFailure).toEqual(
       error(
-        expect.objectContaining({
-          kind: "responseDecode",
+        poly("responseDecode", expect.objectContaining({
           operationName: "strictOperation",
-        }),
+        })),
       ),
     )
 
@@ -311,10 +346,9 @@ describe("openapi-rescript-runtime", () => {
     let transportFailure = await Client.callJson(client, {...operation, requestBody: undefined}, {})
     expect(transportFailure).toEqual(
       error(
-        expect.objectContaining({
-          kind: "transport",
+        poly("transport", expect.objectContaining({
           operationName: "strictOperation",
-        }),
+        })),
       ),
     )
   })
@@ -352,11 +386,10 @@ describe("openapi-rescript-runtime", () => {
 
     expect(result).toEqual(
       error(
-        expect.objectContaining({
-          kind: "unexpectedStatus",
+        poly("unexpectedStatus", expect.objectContaining({
           operationName: "showUser",
           status: 404,
-        }),
+        })),
       ),
     )
   })
@@ -432,11 +465,10 @@ describe("openapi-rescript-runtime", () => {
 
     expect(result).toEqual(
       error(
-        expect.objectContaining({
-          kind: "unexpectedStatus",
+        poly("unexpectedStatus", expect.objectContaining({
           operationName: "mixedSuccesses",
           status: 250,
-        }),
+        })),
       ),
     )
   })

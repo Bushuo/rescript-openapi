@@ -6,6 +6,7 @@ let emit = (_document: Ir.document): Printer.file =>
       "",
       "type t = OpenapiRescriptRuntime.Client.t",
       "type operationError = OpenapiRescriptRuntime.OperationError.t",
+      "type operationErrorOpen<'error> = OpenapiRescriptRuntime.OperationError.row<'error>",
       "type schema<'value> = OpenapiRescriptRuntime.Schema.t<'value>",
       "type parameter = OpenapiRescriptRuntime.Client.parameter",
       "type requestBody = OpenapiRescriptRuntime.Client.requestBody",

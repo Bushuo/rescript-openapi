@@ -38,7 +38,7 @@ let listPetsOperation: Client.jsonOperation = {
 let listPets = (
   client: Client.t,
   params: listPetsParams,
-): promise<result<array<Models.pet>, Client.operationError>> =>
+): promise<result<array<Models.pet>, Client.operationErrorOpen<'error>>> =>
   Client.callJson(client, listPetsOperation, params)
 
 type createPetParams = {
@@ -75,5 +75,5 @@ let createPetOperation: Client.jsonOperation = {
 let createPet = (
   client: Client.t,
   params: createPetParams,
-): promise<result<Models.pet, Client.operationError>> =>
+): promise<result<Models.pet, Client.operationErrorOpen<'error>>> =>
   Client.callJson(client, createPetOperation, params)

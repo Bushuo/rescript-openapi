@@ -31,7 +31,7 @@ let listUsersOperation: Client.jsonOperation = {
 let listUsers = (
   client: Client.t,
   params: listUsersParams,
-): promise<result<unit, Client.operationError>> =>
+): promise<result<unit, Client.operationErrorOpen<'error>>> =>
   Client.callJson(client, listUsersOperation, params)
 
 type getSessionParams = {
@@ -59,7 +59,7 @@ type getSessionResult = { id: string, state: Models.getSessionResponse200State }
 let getSession = (
   client: Client.t,
   params: getSessionParams,
-): promise<result<getSessionResult, Client.operationError>> =>
+): promise<result<getSessionResult, Client.operationErrorOpen<'error>>> =>
   Client.callJson(client, getSessionOperation, params)
 
 type createSessionParams = {
@@ -89,5 +89,5 @@ let createSessionOperation: Client.jsonOperation = {
 let createSession = (
   client: Client.t,
   params: createSessionParams,
-): promise<result<unit, Client.operationError>> =>
+): promise<result<unit, Client.operationErrorOpen<'error>>> =>
   Client.callJson(client, createSessionOperation, params)

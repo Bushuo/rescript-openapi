@@ -122,9 +122,22 @@ describe("codegen", () => {
     expect(openSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
     expect(closedSchemas).not.toContain("let sessionVisibility: t<Models.sessionVisibility> = string\n")
     expect(openDefaultModule).toContain("type getSessionResult = { id: string, state: Models.getSessionResponse200State }")
-    expect(openDefaultModule).toContain("): promise<result<getSessionResult, Client.operationError>> =>")
+    expect(openDefaultModule).toContain("): promise<result<getSessionResult, Client.operationErrorOpen<'error>>> =>")
     expect(closedDefaultModule).toContain("type getSessionResult = { id: string, state: Models.getSessionResponse200State }")
-    expect(closedDefaultModule).toContain("): promise<result<getSessionResult, Client.operationError>> =>")
+    expect(closedDefaultModule).toContain("): promise<result<getSessionResult, Client.operationErrorOpen<'error>>> =>")
+  })
+
+  it("emits a closed operation error alias plus open operation result errors", () => {
+    let output = generate(normalizedPetstore)
+    let client = generatedFile(output, "Client.res")
+    let pets = generatedFile(output, "Pets.res")
+
+    expect(output.ok).toBe(true)
+    expect(client).toContain("type operationError = OpenapiRescriptRuntime.OperationError.t")
+    expect(client).toContain(
+      "type operationErrorOpen<'error> = OpenapiRescriptRuntime.OperationError.row<'error>",
+    )
+    expect(pets).toContain("): promise<result<array<Models.pet>, Client.operationErrorOpen<'error>>> =>")
   })
 
   it("orders named schema definitions before sibling schemas that reference them", () => {
@@ -314,7 +327,7 @@ describe("codegen", () => {
       'optionalNullableField(~name="alcoholHabits", alcoholHabitsDto)',
     )
     expect(defaultModule).toContain(
-      "): promise<result<Models.getProfileHttpResponseBody, Client.operationError>> =>",
+      "): promise<result<Models.getProfileHttpResponseBody, Client.operationErrorOpen<'error>>> =>",
     )
   })
 
@@ -644,7 +657,7 @@ describe("codegen", () => {
 
     expect(output.ok).toBe(true)
     expect(defaultSuccessModule).toContain(
-      "): promise<result<Models.fallbackPayload, Client.operationError>> =>",
+      "): promise<result<Models.fallbackPayload, Client.operationErrorOpen<'error>>> =>",
     )
     expect(defaultSuccessModule).toContain('statusCode: "default"')
     expect(defaultSuccessModule).toContain(
@@ -710,7 +723,7 @@ describe("codegen", () => {
 
     expect(output.ok).toBe(true)
     expect(mixedSuccessModule).toContain(
-      "): promise<result<Models.explicitPayload, Client.operationError>> =>",
+      "): promise<result<Models.explicitPayload, Client.operationErrorOpen<'error>>> =>",
     )
     expect(mixedSuccessModule).toContain('statusCode: "200"')
     expect(mixedSuccessModule).toContain('statusCode: "default"')

@@ -241,7 +241,7 @@ let renderOperationFunction = (operation: Ir.operation): array<string> => {
   "let " ++ operation.name ++ " = (",
   "  client: Client.t,",
   "  params: " ++ paramsTypeName(operation) ++ ",",
-  "): promise<result<" ++ resultType ++ ", Client.operationError>> =>",
+  "): promise<result<" ++ resultType ++ ", Client.operationErrorOpen<'error>>> =>",
   "  Client.callJson(client, " ++ operation.name ++ "Operation, params)",
     ],
   ])
