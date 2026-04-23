@@ -8,10 +8,11 @@ let string: t<string> = OpenapiRescriptRuntime.Schema.string
 let integer: t<int> = OpenapiRescriptRuntime.Schema.integer
 let number: t<float> = OpenapiRescriptRuntime.Schema.number
 let boolean: t<bool> = OpenapiRescriptRuntime.Schema.boolean
-let nullableAsOption = OpenapiRescriptRuntime.Schema.nullableAsOption
+let nullableAsNull = OpenapiRescriptRuntime.Schema.nullableAsNull
 let discriminatedUnion = OpenapiRescriptRuntime.Schema.discriminatedUnion
 let array = OpenapiRescriptRuntime.Schema.array
 let object_ = OpenapiRescriptRuntime.Schema.object_
+let optionalNullableField = OpenapiRescriptRuntime.Schema.makeOptionalNullableField
 
 let pet: t<Models.pet> = object_([
   field(~name="id", ~required=true, integer),

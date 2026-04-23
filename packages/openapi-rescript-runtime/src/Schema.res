@@ -9,6 +9,7 @@ type field = {
   name: string,
   required: bool,
   schema: any,
+  optionalNullable: bool,
 }
 
 type descriptor = {
@@ -29,10 +30,18 @@ let field = (descriptor: descriptor, schema: t<'value>): field => {
   name: descriptor.name,
   required: descriptor.required,
   schema: schema->toAny,
+  optionalNullable: false,
 }
 
 let makeField = (~name: string, ~required: bool, schema: t<'value>): field =>
   field({name, required}, schema)
+
+let makeOptionalNullableField = (~name: string, schema: t<'value>): field => {
+  name,
+  required: false,
+  schema: schema->toAny,
+  optionalNullable: true,
+}
 
 let string: t<string> = S.string
 let int: t<int> = S.int
@@ -55,6 +64,32 @@ let stringMapped = (~decode: string => result<'value, string>, ~encode: 'value =
 let array = (item: t<'value>): t<array<'value>> => S.array(item)
 
 let nullableAsOption = (schema: t<'value>): t<option<'value>> => S.null(schema)
+
+let nullableAsNull = (schema: t<'value>): t<Null.t<'value>> =>
+  S.null(schema)->S.transform(_s => {
+    parser: value =>
+      switch value {
+      | None => Null.null
+      | Some(value) => Null.make(value)
+      },
+    serializer: value => Null.toOption(value),
+  })
+
+let optionalNullableAsNullable = (schema: t<'value>): t<Nullable.t<'value>> =>
+  S.option(S.null(schema))->S.transform(_s => {
+    parser: nested =>
+      switch nested {
+      | None => Nullable.undefined
+      | Some(None) => Nullable.null
+      | Some(Some(value)) => Nullable.make(value)
+      },
+    serializer: value =>
+      switch value {
+      | Nullable.Undefined => None
+      | Nullable.Null => Some(None)
+      | Nullable.Value(value) => Some(Some(value))
+      },
+  })
 
 let stripDiscriminator = (discriminator: string, objectJson: dict<JSON.t>): dict<JSON.t> => {
   let payload = Dict.make()
@@ -126,6 +161,8 @@ let object_ = (fields: array<field>): t<'value> =>
     Array.forEach(fields, field => {
       let value: unknown = if field.required {
         Obj.magic(s.field(field.name, field.schema))
+      } else if field.optionalNullable {
+        Obj.magic(s.field(field.name, optionalNullableAsNullable(field.schema)))
       } else {
         Obj.magic(s.fieldOr(field.name, S.option(field.schema), None))
       }

@@ -244,16 +244,16 @@ describe("codegen", () => {
     let schemas = generatedFile(output, "Schemas.res")
 
     expect(output.ok).toBe(true)
-    expect(models).toContain("type person = option<alcoholHabitsDto>")
+    expect(models).toContain("type person = Null.t<alcoholHabitsDto>")
     expect(models).toContain("type genderFemale = {")
     expect(models).toContain("value: pregnancyStatusDto,")
     expect(models).toContain("type gender =")
     expect(models).toContain("| Female(genderFemale)")
-    expect(models).toContain("type nullableGender = option<")
+    expect(models).toContain("type nullableGender = Null.t<")
     expect(models).toContain("type nullableGenderValueFemale = {")
     expect(models).toContain("| Female(nullableGenderValueFemale)")
     expect(models).not.toContain("| Female({ value: pregnancyStatusDto })")
-    expect(schemas).toContain("nullableAsOption(")
+    expect(schemas).toContain("nullableAsNull(")
     expect(schemas).toContain('discriminatedUnion(~discriminator="kind"')
     expect(schemas.indexOf("let pregnancyStatusDto")).toBeLessThan(schemas.indexOf("let gender"))
   })
@@ -308,14 +308,60 @@ describe("codegen", () => {
     expect(output.ok).toBe(true)
     expect(models).toContain("type alcoholHabitsDto =")
     expect(models).not.toContain("type getProfileHttpResponseBodyAlcoholHabits =")
-    expect(models).toContain("alcoholHabits: option<option<alcoholHabitsDto>>")
+    expect(models).toContain("alcoholHabits: Nullable.t<alcoholHabitsDto>")
     expect(schemas).toContain("let alcoholHabitsDto: t<Models.alcoholHabitsDto> = stringMapped(")
     expect(schemas).toContain(
-      'field(~name="alcoholHabits", ~required=false, nullableAsOption(alcoholHabitsDto))',
+      'optionalNullableField(~name="alcoholHabits", alcoholHabitsDto)',
     )
     expect(defaultModule).toContain(
       "): promise<result<Models.getProfileHttpResponseBody, Client.operationError>> =>",
     )
+  })
+
+  it("emits Null.t and Nullable.t according to required and nullable schema shape", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Nullable Field API",
+        version: "1.0.0",
+      },
+      paths: {},
+      components: {
+        schemas: {
+          AlcoholHabitsDto: {
+            type: "string",
+            enum: ["None", "Occasional"],
+          },
+          Profile: {
+            type: "object",
+            required: ["id", "requiredNullable"],
+            properties: {
+              id: {type: "string"},
+              optionalPlain: {type: "string"},
+              requiredNullable: {
+                oneOf: [{type: "null"}, {$ref: "#/components/schemas/AlcoholHabitsDto"}],
+              },
+              optionalNullable: {
+                oneOf: [{type: "null"}, {$ref: "#/components/schemas/AlcoholHabitsDto"}],
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generate(fixture)
+    let models = generatedFile(output, "Models.res")
+    let schemas = generatedFile(output, "Schemas.res")
+
+    expect(output.ok).toBe(true)
+    expect(models).toContain("id: string,")
+    expect(models).toContain("optionalPlain: option<string>,")
+    expect(models).toContain("requiredNullable: Null.t<alcoholHabitsDto>,")
+    expect(models).toContain("optionalNullable: Nullable.t<alcoholHabitsDto>,")
+    expect(models).not.toContain("option<option<")
+    expect(schemas).toContain('field(~name="requiredNullable", ~required=true, nullableAsNull(alcoholHabitsDto))')
+    expect(schemas).toContain('optionalNullableField(~name="optionalNullable", alcoholHabitsDto)')
   })
 
   it("annotates enum decode constructors when multiple generated variants share constructor names", () => {

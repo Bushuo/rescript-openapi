@@ -5,11 +5,8 @@ let renderField = (~quoteLabels: bool, field: Ir.objectField): string =>
     ~level=1,
     Printer.recordLabel(~quoteAll=quoteLabels, field.name) ++
     ": " ++
-    if field.required {
-      Printer.modelType(field.schema)
-    } else {
-      "option<" ++ Printer.modelType(field.schema) ++ ">"
-    } ++ ",",
+    Printer.objectFieldModelType(field) ++
+    ",",
   )
 
 let renderEnum = (~name: string, ~enumMode: Ir.enumMode, values: array<string>): array<string> => {
@@ -61,7 +58,11 @@ let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => 
     | _ =>
       Printer.indentLine(
         ~level=1,
-        "| " ++ Printer.enumConstructor(case_.tag) ++ "(" ++ Printer.modelType(case_.payload) ++ ")",
+        "| " ++
+        Printer.enumConstructor(case_.tag) ++
+        "(" ++
+        Printer.modelType(case_.payload) ++
+        ")",
       )
     }
   )
@@ -81,12 +82,16 @@ let renderUnion = (~name: string, cases: array<Ir.unionCase>): array<string> => 
   }
 }
 
-let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string> =>
+let renderSchema = (
+  schema: Ir.namedSchema,
+  ~enumMode: Ir.enumMode,
+): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
     renderRecordType(~name=schema.name, fields)
   | Ir.StringEnum({values, _}) => renderEnum(~name=schema.name, ~enumMode, values)
-  | Ir.DiscriminatedUnion({cases, _}) => renderUnion(~name=schema.name, cases)
+  | Ir.DiscriminatedUnion({cases, _}) =>
+    renderUnion(~name=schema.name, cases)
   | Ir.Nullable(Ir.DiscriminatedUnion({cases, _})) =>
     let valueTypeName = schema.name ++ "Value"
 
@@ -96,12 +101,17 @@ let renderSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<strin
       [
         "type " ++
         Printer.typeName(schema.name) ++
-        " = option<" ++
+        " = Null.t<" ++
         Printer.typeName(valueTypeName) ++
         ">",
       ],
     ])
-  | value => ["type " ++ Printer.typeName(schema.name) ++ " = " ++ Printer.modelType(value)]
+  | value => [
+      "type " ++
+      Printer.typeName(schema.name) ++
+      " = " ++
+      Printer.modelType(value),
+    ]
   }
 
 let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {

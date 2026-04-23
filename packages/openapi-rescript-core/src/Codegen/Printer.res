@@ -200,7 +200,7 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
   | Ir.Scalar(_) => "Js.Json.t"
   | Ir.StringEnum(_) => "string"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
-  | Ir.Nullable(inner) => "option<" ++ modelType(~qualifiedNamedRefs, inner) ++ ">"
+  | Ir.Nullable(inner) => "Null.t<" ++ modelType(~qualifiedNamedRefs, inner) ++ ">"
   | Ir.DiscriminatedUnion(_) => "Js.Json.t"
   | Ir.NamedRef(reference) =>
     enumTypeRef(~qualifiedModels=qualifiedNamedRefs, refName(reference))
@@ -208,14 +208,29 @@ let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string
     let quoteLabels = shouldQuoteRecordLabels(Array.map(fields, field => field.name))
     let renderedFields = Array.map(fields, field =>
       recordLabel(~quoteAll=quoteLabels, field.name) ++
-      ": " ++ if field.required {
-        modelType(~qualifiedNamedRefs, field.schema)
-      } else {
-        "option<" ++ modelType(~qualifiedNamedRefs, field.schema) ++ ">"
-      }
+      ": " ++ objectFieldModelType(~qualifiedNamedRefs, field)
     )
 
     "{ " ++ Belt.Array.joinWith(renderedFields, ", ", field => field) ++ " }"
+  }
+
+and optionalModelType = (
+  ~qualifiedNamedRefs: bool=false,
+  schema: Ir.schema,
+): string =>
+  switch schema {
+  | Ir.Nullable(inner) => "Nullable.t<" ++ modelType(~qualifiedNamedRefs, inner) ++ ">"
+  | _ => "option<" ++ modelType(~qualifiedNamedRefs, schema) ++ ">"
+  }
+
+and objectFieldModelType = (
+  ~qualifiedNamedRefs: bool=false,
+  field: Ir.objectField,
+): string =>
+  if field.required {
+    modelType(~qualifiedNamedRefs, field.schema)
+  } else {
+    optionalModelType(~qualifiedNamedRefs, field.schema)
   }
 
 let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
@@ -266,9 +281,9 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     schemaExpr(~qualified, item) ++ ")"
   | Ir.Nullable(inner) =>
     if qualified {
-      "Schemas.nullableAsOption"
+      "Schemas.nullableAsNull"
     } else {
-      "nullableAsOption"
+      "nullableAsNull"
     } ++
     "(" ++
     schemaExpr(~qualified, inner) ++ ")"
@@ -315,19 +330,36 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
   | Ir.NamedRef(reference) =>
     enumSchemaExpr(~qualifiedSchemas=qualified, refName(reference))
   | Ir.Object(fields) =>
-    let renderedFields = Array.map(fields, field =>
-      if qualified {
-        "Schemas.field"
-      } else {
-        "field"
-      } ++
-      "(~name=" ++
-      quote(field.name) ++
-      ", ~required=" ++
-      boolLiteral(field.required) ++
-      ", " ++
-      schemaExpr(~qualified, field.schema) ++ ")"
-    )
+    let renderedFields = Array.map(fields, field => {
+      let fieldExpr = switch (field.required, field.schema) {
+      | (false, Ir.Nullable(inner)) =>
+        if qualified {
+          "Schemas.optionalNullableField"
+        } else {
+          "optionalNullableField"
+        } ++
+        "(~name=" ++
+        quote(field.name) ++
+        ", " ++
+        schemaExpr(~qualified, inner) ++
+        ")"
+      | _ =>
+        if qualified {
+          "Schemas.field"
+        } else {
+          "field"
+        } ++
+        "(~name=" ++
+        quote(field.name) ++
+        ", ~required=" ++
+        boolLiteral(field.required) ++
+        ", " ++
+        schemaExpr(~qualified, field.schema) ++
+        ")"
+      }
+
+      fieldExpr
+    })
 
     if qualified {
       "Schemas.object_("
@@ -336,6 +368,24 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     } ++
     "[" ++
     Belt.Array.joinWith(renderedFields, ", ", field => field) ++ "])"
+  }
+
+let objectFieldSchemaExpr = (field: Ir.objectField): string =>
+  switch (field.required, field.schema) {
+  | (false, Ir.Nullable(inner)) =>
+    "optionalNullableField(~name=" ++
+    quote(field.name) ++
+    ", " ++
+    schemaExpr(inner) ++
+    ")"
+  | _ =>
+    "field(~name=" ++
+    quote(field.name) ++
+    ", ~required=" ++
+    boolLiteral(field.required) ++
+    ", " ++
+    schemaExpr(field.schema) ++
+    ")"
   }
 
 let stringArray = (values: array<string>): string =>

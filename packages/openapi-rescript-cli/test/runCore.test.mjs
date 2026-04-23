@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runCore } from "../src/RunCore.bs.js";
 
 describe("runCore", () => {
-  it("forwards enumMode to the generator", async () => {
+  it("forwards generator options to the generator", async () => {
     const normalized = { openapi: "3.1.0" };
     const generate = vi.fn(() => ({ ok: true, files: [] }));
     const loadGenerator = vi.fn(async () => generate);

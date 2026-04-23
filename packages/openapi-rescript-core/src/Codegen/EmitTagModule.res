@@ -24,19 +24,33 @@ let effectiveSecurity = (~document: Ir.document, ~operation: Ir.operation): arra
 
 let operationResultTypeName = (operation: Ir.operation): string => operation.name ++ "Result"
 
-let rec renderAnonymousResultType = (~baseName: string, schema: Ir.schema): (string, array<string>) =>
+let rec renderAnonymousResultType = (
+  ~baseName: string,
+  schema: Ir.schema,
+): (string, array<string>) =>
   switch schema {
   | Ir.Object(_) =>
     (
       baseName,
-      ["type " ++ baseName ++ " = " ++ Printer.modelType(~qualifiedNamedRefs=true, schema)],
+      [
+        "type " ++
+        baseName ++
+        " = " ++
+        Printer.modelType(~qualifiedNamedRefs=true, schema),
+      ],
     )
   | Ir.Array(item) =>
-    let (itemType, aliasLines) = renderAnonymousResultType(~baseName=baseName ++ "Item", item)
+    let (itemType, aliasLines) = renderAnonymousResultType(
+      ~baseName=baseName ++ "Item",
+      item,
+    )
     ("array<" ++ itemType ++ ">", aliasLines)
   | Ir.Nullable(inner) =>
-    let (innerType, aliasLines) = renderAnonymousResultType(~baseName=baseName ++ "Value", inner)
-    ("option<" ++ innerType ++ ">", aliasLines)
+    let (innerType, aliasLines) = renderAnonymousResultType(
+      ~baseName=baseName ++ "Value",
+      inner,
+    )
+    ("Null.t<" ++ innerType ++ ">", aliasLines)
   | _ => (Printer.modelType(~qualifiedNamedRefs=true, schema), [])
   }
 
@@ -54,7 +68,10 @@ let operationResultType = (operation: Ir.operation): (string, array<string>) =>
     }
   }
 
-let renderParameterField = (~quoteLabels: bool, parameter: Ir.parameter): string =>
+let renderParameterField = (
+  ~quoteLabels: bool,
+  parameter: Ir.parameter,
+): string =>
   Printer.indentLine(
     ~level=1,
     Printer.recordLabel(~quoteAll=quoteLabels, parameter.name) ++
@@ -62,7 +79,7 @@ let renderParameterField = (~quoteLabels: bool, parameter: Ir.parameter): string
     if parameter.required {
       Printer.modelType(~qualifiedNamedRefs=true, parameter.schema)
     } else {
-      "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, parameter.schema) ++ ">"
+      Printer.optionalModelType(~qualifiedNamedRefs=true, parameter.schema)
     } ++ ",",
   )
 
@@ -86,14 +103,16 @@ let renderParamsType = (operation: Ir.operation): array<string> => {
         if body.required {
           Printer.modelType(~qualifiedNamedRefs=true, body.schema)
         } else {
-          "option<" ++ Printer.modelType(~qualifiedNamedRefs=true, body.schema) ++ ">"
+          Printer.optionalModelType(~qualifiedNamedRefs=true, body.schema)
         } ++ ",",
       ),
     ]
   }
 
   let fields = Belt.Array.concat(
-    Array.map(operation.parameters, parameter => renderParameterField(~quoteLabels, parameter)),
+    Array.map(operation.parameters, parameter =>
+      renderParameterField(~quoteLabels, parameter)
+    ),
     bodyField,
   )
 
@@ -110,7 +129,9 @@ let renderParameter = (parameter: Ir.parameter): array<string> => [
   "    },",
 ]
 
-let renderRequestBody = (requestBody: option<Ir.requestBody>): array<string> =>
+let renderRequestBody = (
+  requestBody: option<Ir.requestBody>,
+): array<string> =>
   switch requestBody {
   | None => ["  requestBody: None,"]
   | Some(body) => [
@@ -153,15 +174,24 @@ let renderSecurityScheme = (scheme: Ir.securityScheme): array<string> => [
   "    },",
 ]
 
-let renderOperationValue = (~document: Ir.document, operation: Ir.operation): array<string> => {
+let renderOperationValue = (
+  ~document: Ir.document,
+  operation: Ir.operation,
+): array<string> => {
   let parameterLines = ref([])
   Array.forEach(operation.parameters, parameter =>
-    parameterLines.contents = Belt.Array.concat(parameterLines.contents, renderParameter(parameter))
+    parameterLines.contents = Belt.Array.concat(
+      parameterLines.contents,
+      renderParameter(parameter),
+    )
   )
 
   let responseLines = ref([])
   Array.forEach(operation.responses, response =>
-    responseLines.contents = Belt.Array.concat(responseLines.contents, renderResponse(response))
+    responseLines.contents = Belt.Array.concat(
+      responseLines.contents,
+      renderResponse(response),
+    )
   )
 
   let securitySchemeLines = ref([])
@@ -217,7 +247,10 @@ let renderOperationFunction = (operation: Ir.operation): array<string> => {
   ])
 }
 
-let renderOperation = (~document: Ir.document, operation: Ir.operation): array<string> =>
+let renderOperation = (
+  ~document: Ir.document,
+  operation: Ir.operation,
+): array<string> =>
   Belt.Array.concatMany([
     renderParamsType(operation),
     [""],
@@ -288,7 +321,10 @@ let emitForTag = (
       body.contents = Belt.Array.concat(body.contents, [""])
     }
 
-    body.contents = Belt.Array.concat(body.contents, renderOperation(~document, operation))
+    body.contents = Belt.Array.concat(
+      body.contents,
+      renderOperation(~document, operation),
+    )
   })
 
   Printer.makeFile(

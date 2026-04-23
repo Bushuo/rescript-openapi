@@ -83,6 +83,7 @@ V1 supports a strict subset of OpenAPI 3.1:
 - JSON media types only, including `application/json` and `application/*+json`
 - auth support limited to `apiKey` in header/query/cookie plus `http` basic and bearer schemes
 - string enums in both default open mode and `--enum-mode=closed`
+- nullable values use ReScript nullability types: required nullable fields emit `Null.t<T>`, optional nullable fields emit `Nullable.t<T>`
 - a strict `oneOf` subset:
   nullable wrappers with exactly one `null` branch plus one supported non-null schema, and
   structurally safe discriminated object unions with inline literal discriminator values

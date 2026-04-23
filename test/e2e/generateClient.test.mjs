@@ -83,12 +83,12 @@ describe("generateClient", () => {
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("")
       expect(result.stderr).toBe("")
-      expect(models).toContain("type person = option<")
+      expect(models).toContain("type person = Null.t<")
       expect(models).toContain("| Female")
-      expect(models).toContain("type nullableGender = option<")
-      expect(schemas).toContain("nullableAsOption(")
+      expect(models).toContain("type nullableGender = Null.t<")
+      expect(schemas).toContain("nullableAsNull(")
       expect(schemas).toContain('discriminatedUnion(~discriminator="kind"')
-      expect(operations).toContain("Schemas.nullableAsOption(")
+      expect(operations).toContain("Schemas.nullableAsNull(")
       expect(operations).toContain('Schemas.discriminatedUnion(~discriminator="kind"')
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
@@ -107,9 +107,9 @@ describe("generateClient", () => {
       const models = readFileSync(join(targetDir, "Models.res"), "utf8")
       const schemas = readFileSync(join(targetDir, "Schemas.res"), "utf8")
       expect(models).toContain("type saveProfileRequestBody = {")
-      expect(models).toContain("age: option<int>")
+      expect(models).toContain("age: Null.t<int>")
       expect(schemas).toContain("let saveProfileRequestBody: t<Models.saveProfileRequestBody> =")
-      expect(schemas).toContain("nullableAsOption(integer)")
+      expect(schemas).toContain("nullableAsNull(integer)")
     } finally {
       rmSync(targetDir, {recursive: true, force: true})
     }

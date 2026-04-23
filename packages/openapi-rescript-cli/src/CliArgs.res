@@ -13,8 +13,9 @@ let structuredDiagnostic = message => {
 module Options = {
   type t = OpenapiGenerator.options
 
+  let enumModePattern = "--enum-mode="
+
   let parseEnumModeArg = arg => {
-    let enumModePattern = "--enum-mode="
     if !(arg->String.startsWith(enumModePattern)) {
       Error(structuredDiagnostic(`Unknown option: ${arg}`))
     } else {
@@ -28,23 +29,28 @@ module Options = {
     }
   }
 
-  let parse = (args: array<string>): result<(array<string>, t), diagnostic> => {
-    let arg = args->Array.getUnsafe(0)
-
-    if arg->String.startsWith("--") {
-      let newArgs = args->Array.slice(~start=1)
-      let? Ok(parsedEnumMode) = parseEnumModeArg(arg)
-
-      Ok(
-        newArgs,
-        {
-          enumMode: parsedEnumMode,
-        },
-      )
+  let parseOption = (_options: t, arg: string): result<t, diagnostic> =>
+    if arg->String.startsWith(enumModePattern) {
+      let? Ok(enumMode) = parseEnumModeArg(arg)
+      Ok({enumMode: enumMode})
     } else {
-      Ok(args, OpenapiGenerator.defaultOptions)
+      Error(structuredDiagnostic(`Unknown option: ${arg}`))
     }
-  }
+
+  let rec parseLeadingOptions = (
+    args: array<string>,
+    options: t,
+  ): result<(array<string>, t), diagnostic> =>
+    switch args->Array.get(0) {
+    | Some(arg) if arg->String.startsWith("--") =>
+      let newArgs = args->Array.slice(~start=1)
+      let? Ok(options) = parseOption(options, arg)
+      parseLeadingOptions(newArgs, options)
+    | _ => Ok(args, options)
+    }
+
+  let parse = (args: array<string>): result<(array<string>, t), diagnostic> =>
+    parseLeadingOptions(args, OpenapiGenerator.defaultOptions)
 }
 
 type cliArgs = {

@@ -50,11 +50,21 @@ describe("parseArgs", () => {
     );
   });
 
-  it("rejects misplaced enum mode options", () => {
+  it("rejects misplaced options", () => {
     expect(parseArgs(["fixtures/spec.yaml", "--enum-mode=closed"])).toEqual(
       error({
         path: [],
         message: "Unknown option: --enum-mode=closed",
+      }),
+    );
+
+  });
+
+  it("rejects unsupported optional nullable options", () => {
+    expect(parseArgs(["--optional-nullable=collapse", "fixtures/spec.yaml"])).toEqual(
+      error({
+        path: [],
+        message: "Unknown option: --optional-nullable=collapse",
       }),
     );
   });
@@ -77,7 +87,7 @@ describe("parseArgs", () => {
     );
   });
 
-  it("includes the enum mode flag in usage diagnostics", () => {
+  it("includes supported flags in usage diagnostics", () => {
     expect(parseArgs([])).toEqual(
       error({
         path: [],

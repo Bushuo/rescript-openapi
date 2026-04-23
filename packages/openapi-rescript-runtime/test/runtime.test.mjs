@@ -41,14 +41,34 @@ describe("openapi-rescript-runtime", () => {
     expect(S.reverseConvertToJsonStringOrThrow(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
   })
 
-  it("decodes nullable option schemas from null and non-null JSON", async () => {
+  it("decodes nullable schemas as Null.t values", async () => {
     let {Schema, S} = await loadRuntime()
-    let nullableString = Schema.nullableAsOption(Schema.string)
+    let nullableString = Schema.nullableAsNull(Schema.string)
 
-    expect(S.parseJsonStringOrThrow("null", nullableString)).toBeUndefined()
+    expect(S.parseJsonStringOrThrow("null", nullableString)).toBeNull()
     expect(S.parseJsonStringOrThrow(JSON.stringify("Ada"), nullableString)).toBe("Ada")
-    expect(S.reverseConvertToJsonStringOrThrow(undefined, nullableString)).toBe("null")
+    expect(S.reverseConvertToJsonStringOrThrow(null, nullableString)).toBe("null")
     expect(S.reverseConvertToJsonStringOrThrow("Ada", nullableString)).toBe(JSON.stringify("Ada"))
+  })
+
+  it("decodes optional nullable object fields as Nullable.t values", async () => {
+    let {Schema, S} = await loadRuntime()
+    let profileSchema = Schema.object_([Schema.makeOptionalNullableField("nickname", Schema.string)])
+
+    expect(S.parseJsonStringOrThrow("{}", profileSchema)).toEqual({nickname: undefined})
+    expect(S.parseJsonStringOrThrow(JSON.stringify({nickname: null}), profileSchema)).toEqual({
+      nickname: null,
+    })
+    expect(S.parseJsonStringOrThrow(JSON.stringify({nickname: "Ada"}), profileSchema)).toEqual({
+      nickname: "Ada",
+    })
+    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: undefined}, profileSchema))).toEqual({})
+    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: null}, profileSchema))).toEqual({
+      nickname: null,
+    })
+    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: "Ada"}, profileSchema))).toEqual({
+      nickname: "Ada",
+    })
   })
 
   it("decodes and re-encodes discriminated unions", async () => {

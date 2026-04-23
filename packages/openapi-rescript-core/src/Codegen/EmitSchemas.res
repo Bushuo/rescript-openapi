@@ -9,10 +9,11 @@ let baseHeader = [
   "let integer: t<int> = OpenapiRescriptRuntime.Schema.integer",
   "let number: t<float> = OpenapiRescriptRuntime.Schema.number",
   "let boolean: t<bool> = OpenapiRescriptRuntime.Schema.boolean",
-  "let nullableAsOption = OpenapiRescriptRuntime.Schema.nullableAsOption",
+  "let nullableAsNull = OpenapiRescriptRuntime.Schema.nullableAsNull",
   "let discriminatedUnion = OpenapiRescriptRuntime.Schema.discriminatedUnion",
   "let array = OpenapiRescriptRuntime.Schema.array",
   "let object_ = OpenapiRescriptRuntime.Schema.object_",
+  "let optionalNullableField = OpenapiRescriptRuntime.Schema.makeOptionalNullableField",
 ]
 
 let renderEnumSchema = (
@@ -78,17 +79,16 @@ let renderEnumSchema = (
   ])
 }
 
-let emitSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string> =>
+let renderObjectField = (field: Ir.objectField): string =>
+  "  " ++ Printer.objectFieldSchemaExpr(field) ++ ","
+
+let emitSchema = (
+  schema: Ir.namedSchema,
+  ~enumMode: Ir.enumMode,
+): array<string> =>
   switch schema.schema {
   | Ir.Object(fields) =>
-    let fieldLines = Array.map(fields, field =>
-      "  field(~name=" ++
-      Printer.quote(field.name) ++
-      ", ~required=" ++
-      Printer.boolLiteral(field.required) ++
-      ", " ++
-      Printer.schemaExpr(field.schema) ++ "),"
-    )
+    let fieldLines = Array.map(fields, field => renderObjectField(field))
 
     Belt.Array.concatMany([
       [
@@ -112,7 +112,7 @@ let emitSchema = (schema: Ir.namedSchema, ~enumMode: Ir.enumMode): array<string>
   }
 
 let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {
-  let header = if Array.some(document.schemas, schema =>
+  let enumHeader = if Array.some(document.schemas, schema =>
     switch schema.schema {
     | Ir.StringEnum(_) => true
     | _ => false
@@ -122,6 +122,7 @@ let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {
   } else {
     baseHeader
   }
+  let header = enumHeader
   let definitions = ref([])
   let orderedSchemas = SchemaOrder.orderSchemas(document.schemas)
 
@@ -130,7 +131,10 @@ let emit = (document: Ir.document, ~enumMode: Ir.enumMode): Printer.file => {
       definitions.contents = Belt.Array.concat(definitions.contents, [""])
     }
 
-    definitions.contents = Belt.Array.concat(definitions.contents, emitSchema(schema, ~enumMode))
+    definitions.contents = Belt.Array.concat(
+      definitions.contents,
+      emitSchema(schema, ~enumMode),
+    )
   })
 
   let lines = if Array.length(definitions.contents) == 0 {
