@@ -133,6 +133,53 @@ describe("generateClient", () => {
     }
   })
 
+  it("uses scalar mappings from a config file", () => {
+    const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
+    const specPath = join(targetDir, "scalars.yaml")
+    const configPath = join(targetDir, "openapi-rescript.json")
+
+    try {
+      writeFileSync(configPath, JSON.stringify({
+        scalars: {
+          "string:uuid": {
+            type: "Hybit.Id.t",
+            module: "ApiScalars.Uuid",
+          },
+        },
+      }))
+      writeFileSync(specPath, [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Scalar Mapping",
+        "  version: 1.0.0",
+        "paths: {}",
+        "components:",
+        "  schemas:",
+        "    Session:",
+        "      type: object",
+        "      required:",
+        "        - id",
+        "      properties:",
+        "        id:",
+        "          type: string",
+        "          format: uuid",
+        "",
+      ].join("\n"))
+
+      const result = runCli(specPath, targetDir, [`--config=${configPath}`])
+      const models = readFileSync(join(targetDir, "Models.res"), "utf8")
+      const schemas = readFileSync(join(targetDir, "Schemas.res"), "utf8")
+
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("")
+      expect(models).toContain("id: Hybit.Id.t,")
+      expect(schemas).toContain('field(~name="id", ~required=true, ApiScalars.Uuid.schema)')
+    } finally {
+      rmSync(targetDir, {recursive: true, force: true})
+    }
+  })
+
   it("rejects misplaced enum mode options with a structured diagnostic", () => {
     const targetDir = mkdtempSync(join(tmpdir(), "openapi-rescript-e2e-"))
 

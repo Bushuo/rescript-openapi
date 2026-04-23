@@ -1,13 +1,14 @@
 import {beforeEach, describe, expect, it, vi} from "vitest"
 
 const loadRuntime = async () => {
-  let [Client, Schema, S] = await Promise.all([
+  let [Client, Schema, Scalar, S] = await Promise.all([
     import("../src/Client.bs.js"),
     import("../src/Schema.bs.js"),
+    import("../src/Scalar.bs.js"),
     import("../node_modules/sury/src/S.bs.js"),
   ])
 
-  return {Client, Schema, S}
+  return {Client, Schema, Scalar, S}
 }
 
 const ok = value => ({TAG: "Ok", _0: value})
@@ -39,6 +40,24 @@ describe("openapi-rescript-runtime", () => {
     )
     expect(S.reverseConvertToJsonStringOrThrow(active, openStatusSchema)).toBe(JSON.stringify("Active"))
     expect(S.reverseConvertToJsonStringOrThrow(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
+  })
+
+  it("builds string scalar schemas with the scalar functor", async () => {
+    let {Scalar, S} = await loadRuntime()
+    let Uuid = Scalar.MakeString({
+      decode: value => (value.startsWith("id_") ? ok({value}) : error("Invalid UUID")),
+      encode: uuid => uuid.value,
+    })
+
+    expect(S.parseJsonStringOrThrow(JSON.stringify("id_123"), Uuid.schema)).toEqual({
+      value: "id_123",
+    })
+    expect(() => S.parseJsonStringOrThrow(JSON.stringify("bad"), Uuid.schema)).toThrow(
+      /Invalid UUID/,
+    )
+    expect(S.reverseConvertToJsonStringOrThrow({value: "id_456"}, Uuid.schema)).toBe(
+      JSON.stringify("id_456"),
+    )
   })
 
   it("decodes nullable schemas as Null.t values", async () => {

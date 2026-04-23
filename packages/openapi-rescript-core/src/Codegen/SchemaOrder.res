@@ -7,7 +7,7 @@ let appendUnique = (values: array<string>, value: string): array<string> =>
 
 let rec collectNamedSchemaDependencies = (schema: Ir.schema): array<string> =>
   switch schema {
-  | Ir.Scalar(_) | Ir.StringEnum(_) => []
+  | Ir.Scalar(_) | Ir.MappedScalar(_) | Ir.StringEnum(_) => []
   | Ir.Array(item) => collectNamedSchemaDependencies(item)
   | Ir.Nullable(inner) => collectNamedSchemaDependencies(inner)
   | Ir.NamedRef(reference) => [Printer.refName(reference)]

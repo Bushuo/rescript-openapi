@@ -1,6 +1,10 @@
 type dependencies = {
   parseInput?: string => promise<JSON.t>,
   loadGenerator?: unit => promise<OpenapiGenerator.generator>,
+  loadConfigOptions?: (
+    string,
+    OpenapiGenerator.options,
+  ) => promise<result<OpenapiGenerator.options, OpenapiGenerator.diagnostic>>,
   syncGeneratedFiles?: (string, array<OpenapiGenerator.file>) => promise<unit>,
 }
 
@@ -86,28 +90,39 @@ let runCore = async (
   ~targetDir=Node.process->Node.cwd(),
   ~options=OpenapiGenerator.defaultOptions,
   ~dependencies={}: dependencies,
+  ~configPath=?,
 ) => {
   let parseInput = dependencies.parseInput->Option.getOr(ParseInput.parseInput)
   let loadGenerator =
     dependencies.loadGenerator->Option.getOr(async () => OpenapiGenerator.generate)
+  let loadConfigOptions = dependencies.loadConfigOptions->Option.getOr(Config.loadOptions)
   let syncGeneratedFiles = dependencies.syncGeneratedFiles->Option.getOr(syncGeneratedFiles)
 
   try {
     let normalized = await parseInput(entryPath)
     let generator = await loadGenerator()
-    let output = generator(normalized, ~options)
+    let loadedOptions = switch configPath {
+    | None => Ok(options)
+    | Some(path) => await loadConfigOptions(path, options)
+    }
 
-    if !output.ok {
-      {
-        ok: false,
-        diagnostic: ?output.error,
-      }
-    } else {
-      await syncGeneratedFiles(targetDir, output.files)
+    switch loadedOptions {
+    | Error(diagnostic) => {ok: false, diagnostic}
+    | Ok(options) =>
+      let output = generator(normalized, ~options)
 
-      {
-        ok: true,
-        outputFiles: output.files->Array.map(file => file.path),
+      if !output.ok {
+        {
+          ok: false,
+          diagnostic: ?output.error,
+        }
+      } else {
+        await syncGeneratedFiles(targetDir, output.files)
+
+        {
+          ok: true,
+          outputFiles: output.files->Array.map(file => file.path),
+        }
       }
     }
   } catch {

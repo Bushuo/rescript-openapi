@@ -2,8 +2,21 @@ type enumMode =
   | @as("open") Open
   | @as("closed") Closed
 
+type scalarOverride = {
+  key: string,
+  typeName: string,
+  moduleName: string,
+}
+
+type mappedScalar = {
+  wireType: string,
+  typeName: string,
+  moduleName: string,
+}
+
 type rec schema =
   | Scalar(string)
+  | MappedScalar(mappedScalar)
   | StringEnum({name: string, values: array<string>, path: array<string>})
   | Array(schema)
   | Object(array<objectField>)

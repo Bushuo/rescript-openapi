@@ -1,4 +1,4 @@
-let usageMessage = "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]"
+let usageMessage = "Usage: openapi-rescript [--enum-mode=open|closed] [--config=<path>] <spec-file> [output-dir]"
 
 type diagnostic = {
   path: array<string>,
@@ -12,8 +12,13 @@ let structuredDiagnostic = message => {
 
 module Options = {
   type t = OpenapiGenerator.options
+  type state = {
+    options: t,
+    configPath: option<string>,
+  }
 
   let enumModePattern = "--enum-mode="
+  let configPattern = "--config="
 
   let parseEnumModeArg = arg => {
     if !(arg->String.startsWith(enumModePattern)) {
@@ -29,32 +34,50 @@ module Options = {
     }
   }
 
-  let parseOption = (_options: t, arg: string): result<t, diagnostic> =>
+  let parseOption = (state: state, arg: string): result<state, diagnostic> =>
     if arg->String.startsWith(enumModePattern) {
       let? Ok(enumMode) = parseEnumModeArg(arg)
-      Ok({enumMode: enumMode})
+      Ok({
+        ...state,
+        options: {...state.options, enumMode},
+      })
+    } else if arg->String.startsWith(configPattern) {
+      let configPath = arg->String.slice(~start=String.length(configPattern))
+
+      if String.isEmpty(configPath) {
+        Error(structuredDiagnostic("Invalid config path"))
+      } else {
+        Ok({...state, configPath: Some(configPath)})
+      }
     } else {
       Error(structuredDiagnostic(`Unknown option: ${arg}`))
     }
 
-  let rec parseLeadingOptions = (
-    args: array<string>,
-    options: t,
-  ): result<(array<string>, t), diagnostic> =>
+  let rec parseLeadingOptions = (args: array<string>, state: state): result<
+    (array<string>, state),
+    diagnostic,
+  > =>
     switch args->Array.get(0) {
     | Some(arg) if arg->String.startsWith("--") =>
       let newArgs = args->Array.slice(~start=1)
-      let? Ok(options) = parseOption(options, arg)
-      parseLeadingOptions(newArgs, options)
-    | _ => Ok(args, options)
+      let? Ok(state) = parseOption(state, arg)
+      parseLeadingOptions(newArgs, state)
+    | _ => Ok(args, state)
     }
 
-  let parse = (args: array<string>): result<(array<string>, t), diagnostic> =>
-    parseLeadingOptions(args, OpenapiGenerator.defaultOptions)
+  let parse = (args: array<string>): result<(array<string>, state), diagnostic> =>
+    parseLeadingOptions(
+      args,
+      {
+        options: OpenapiGenerator.defaultOptions,
+        configPath: None,
+      },
+    )
 }
 
 type cliArgs = {
   options: Options.t,
+  configPath: option<string>,
   inputPath: string,
   targetDir: string,
 }
@@ -89,7 +112,7 @@ let parseArgs = (args: array<string>): result<cliArgs, diagnostic> => {
   if Array.length(args) == 0 {
     Error(structuredDiagnostic(usageMessage))
   } else {
-    let? Ok((args, options)) = Options.parse(args)
+    let? Ok((args, state)) = Options.parse(args)
 
     let? Ok(args, inputPath) = parseInputPath(args)
 
@@ -104,7 +127,8 @@ let parseArgs = (args: array<string>): result<cliArgs, diagnostic> => {
       }
     } else {
       Ok({
-        options,
+        options: state.options,
+        configPath: state.configPath,
         inputPath,
         targetDir,
       })

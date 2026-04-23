@@ -191,13 +191,20 @@ let refName = (reference: string): string => {
   }
 }
 
+let scalarBase = (value: string): string =>
+  switch split(value, ":")->Array.get(0) {
+  | Some(base) => base
+  | None => value
+  }
+
 let rec modelType = (~qualifiedNamedRefs: bool=false, schema: Ir.schema): string =>
   switch schema {
+  | Ir.MappedScalar({typeName}) => typeName
   | Ir.Scalar("string") => "string"
   | Ir.Scalar("integer") => "int"
   | Ir.Scalar("number") => "float"
   | Ir.Scalar("boolean") => "bool"
-  | Ir.Scalar(_) => "Js.Json.t"
+  | Ir.Scalar(value) => modelType(~qualifiedNamedRefs, Ir.Scalar(scalarBase(value)))
   | Ir.StringEnum(_) => "string"
   | Ir.Array(item) => "array<" ++ modelType(~qualifiedNamedRefs, item) ++ ">"
   | Ir.Nullable(inner) => "Null.t<" ++ modelType(~qualifiedNamedRefs, inner) ++ ">"
@@ -235,6 +242,7 @@ and objectFieldModelType = (
 
 let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
   switch schema {
+  | Ir.MappedScalar({moduleName}) => moduleName ++ ".schema"
   | Ir.Scalar("string") =>
     if qualified {
       "Schemas.string"
@@ -265,12 +273,7 @@ let rec schemaExpr = (~qualified: bool=false, schema: Ir.schema): string =>
     } else {
       "string"
     }
-  | Ir.Scalar(_) =>
-    if qualified {
-      "Schemas.string"
-    } else {
-      "string"
-    }
+  | Ir.Scalar(value) => schemaExpr(~qualified, Ir.Scalar(scalarBase(value)))
   | Ir.Array(item) =>
     if qualified {
       "Schemas.array"

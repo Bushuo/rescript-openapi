@@ -86,6 +86,12 @@ let copySchemaObjectWithType = (
   output
 }
 
+let stringScalarKey = (schemaObject: dict<JSON.t>): string =>
+  switch Dict.get(schemaObject, "format")->Belt.Option.flatMap(JSON.Decode.string) {
+  | Some(format) => "string:" ++ format
+  | None => "string"
+  }
+
 type oneOfBranch = {
   index: int,
   path: array<string>,
@@ -494,7 +500,7 @@ and decodeObject = (~path: array<string>, schemaObject: dict<JSON.t>): result<Ir
           switch JSON.Decode.string(typeJson) {
           | Some("array") => decodeArraySchema(~path, schemaObject)
           | Some("object") => decodeObjectSchema(~path, schemaObject)
-          | Some("string") => Ok(Ir.Scalar("string"))
+          | Some("string") => Ok(Ir.Scalar(stringScalarKey(schemaObject)))
           | Some("integer") => Ok(Ir.Scalar("integer"))
           | Some("number") => Ok(Ir.Scalar("number"))
           | Some("boolean") => Ok(Ir.Scalar("boolean"))

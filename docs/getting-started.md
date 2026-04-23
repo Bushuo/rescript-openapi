@@ -11,7 +11,7 @@ This repository is a `pnpm` workspace with three packages:
 The generator CLI is not exposed through a root `pnpm exec` command in this repository. Use the repository-local entrypoint directly:
 
 ```bash
-node packages/openapi-rescript-cli/bin/openapi-rescript.mjs [--enum-mode=open|closed] <spec-file> [output-dir]
+node packages/openapi-rescript-cli/bin/openapi-rescript.mjs [--enum-mode=open|closed] [--config=<path>] <spec-file> [output-dir]
 ```
 
 ## Install
@@ -44,6 +44,35 @@ String enums are supported. The CLI defaults to `--enum-mode=open`, which preser
 
 ```bash
 node packages/openapi-rescript-cli/bin/openapi-rescript.mjs --enum-mode=closed fixtures/specs/petstore.yaml ./tmp/petstore-client
+```
+
+Use `--config=<path>` when OpenAPI string formats should map to domain types instead of plain `string`. Config scalar keys are `<type>:<format>`; currently only `string:<format>` is supported.
+
+```json
+{
+  "scalars": {
+    "string:uuid": {
+      "type": "Hybit.Id.t",
+      "module": "ApiScalars.Uuid"
+    }
+  }
+}
+```
+
+The generated code will use `Hybit.Id.t` in models and `ApiScalars.Uuid.schema` in schemas. Implement that converter module with the runtime scalar functor:
+
+```rescript
+module Uuid = OpenapiRescriptRuntime.Scalar.MakeString({
+  type t = Hybit.Id.t
+
+  let decode = raw =>
+    switch Hybit.Id.fromString(raw) {
+    | Some(id) => Ok(id)
+    | None => Error("Invalid UUID")
+    }
+
+  let encode = Hybit.Id.toString
+})
 ```
 
 Expected output files:
@@ -83,6 +112,7 @@ V1 supports a strict subset of OpenAPI 3.1:
 - JSON media types only, including `application/json` and `application/*+json`
 - auth support limited to `apiKey` in header/query/cookie plus `http` basic and bearer schemes
 - string enums in both default open mode and `--enum-mode=closed`
+- configurable `string:<format>` scalar mappings through `--config=<path>`
 - nullable values use ReScript nullability types: required nullable fields emit `Null.t<T>`, optional nullable fields emit `Nullable.t<T>`
 - a strict `oneOf` subset:
   nullable wrappers with exactly one `null` branch plus one supported non-null schema, and

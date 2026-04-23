@@ -21,7 +21,9 @@ describe("parseArgs", () => {
       ok({
         options: {
           enumMode: "open",
+          scalars: [],
         },
+        configPath: undefined,
         inputPath: "fixtures/spec.yaml",
         targetDir: process.cwd(),
       }),
@@ -33,7 +35,9 @@ describe("parseArgs", () => {
       ok({
         options: {
           enumMode: "open",
+          scalars: [],
         },
+        configPath: undefined,
         inputPath: "fixtures/spec.yaml",
         targetDir: "out",
       }),
@@ -43,7 +47,21 @@ describe("parseArgs", () => {
       ok({
         options: {
           enumMode: "closed",
+          scalars: [],
         },
+        configPath: undefined,
+        inputPath: "fixtures/spec.yaml",
+        targetDir: process.cwd(),
+      }),
+    );
+
+    expect(parseArgs(["--config=openapi-rescript.json", "fixtures/spec.yaml"])).toEqual(
+      ok({
+        options: {
+          enumMode: "open",
+          scalars: [],
+        },
+        configPath: "openapi-rescript.json",
         inputPath: "fixtures/spec.yaml",
         targetDir: process.cwd(),
       }),
@@ -92,7 +110,7 @@ describe("parseArgs", () => {
       error({
         path: [],
         message:
-          "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]",
+          "Usage: openapi-rescript [--enum-mode=open|closed] [--config=<path>] <spec-file> [output-dir]",
       }),
     );
 
@@ -100,7 +118,7 @@ describe("parseArgs", () => {
       error({
         path: [],
         message:
-          "Usage: openapi-rescript [--enum-mode=open|closed] <spec-file> [output-dir]",
+          "Usage: openapi-rescript [--enum-mode=open|closed] [--config=<path>] <spec-file> [output-dir]",
       }),
     );
   });

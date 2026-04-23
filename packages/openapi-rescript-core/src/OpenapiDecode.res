@@ -459,7 +459,7 @@ let rec liftEnumSchema = (
   schema: Ir.schema,
 ): result<Ir.schema> =>
   switch schema {
-  | Ir.Scalar(_) => Ok(schema)
+  | Ir.Scalar(_) | Ir.MappedScalar(_) => Ok(schema)
   | Ir.NamedRef(_) => Ok(schema)
   | Ir.StringEnum({name: _, values, path: enumPath}) =>
     switch Naming.validateEnumConstructors(~path=enumPath, values) {

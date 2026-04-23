@@ -364,6 +364,86 @@ describe("codegen", () => {
     expect(schemas).toContain('optionalNullableField(~name="optionalNullable", alcoholHabitsDto)')
   })
 
+  it("uses configured scalar mappings for formatted string schemas", () => {
+    let fixture = {
+      openapi: "3.1.0",
+      info: {
+        title: "Scalar Mapping API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/sessions/{sessionId}": {
+          get: {
+            operationId: "getSession",
+            parameters: [
+              {
+                name: "sessionId",
+                in: "path",
+                required: true,
+                schema: {type: "string", format: "uuid"},
+              },
+            ],
+            responses: {
+              200: {
+                description: "ok",
+                content: {
+                  "application/json": {
+                    schema: {$ref: "#/components/schemas/Session"},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          Session: {
+            type: "object",
+            required: ["id", "parentId"],
+            properties: {
+              id: {type: "string", format: "uuid"},
+              parentId: {
+                type: ["string", "null"],
+                format: "uuid",
+              },
+              ownerId: {
+                type: ["string", "null"],
+                format: "uuid",
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let output = generateWithOptions(fixture, {
+      enumMode: "open",
+      scalars: [
+        {
+          key: "string:uuid",
+          typeName: "Hybit.Id.t",
+          moduleName: "ApiScalars.Uuid",
+        },
+      ],
+    })
+    let models = generatedFile(output, "Models.res")
+    let schemas = generatedFile(output, "Schemas.res")
+    let defaultModule = generatedFile(output, "Default_.res")
+
+    expect(output.ok).toBe(true)
+    expect(models).toContain("id: Hybit.Id.t,")
+    expect(models).toContain("parentId: Null.t<Hybit.Id.t>,")
+    expect(models).toContain("ownerId: Nullable.t<Hybit.Id.t>,")
+    expect(schemas).toContain('field(~name="id", ~required=true, ApiScalars.Uuid.schema)')
+    expect(schemas).toContain(
+      'field(~name="parentId", ~required=true, nullableAsNull(ApiScalars.Uuid.schema))',
+    )
+    expect(schemas).toContain('optionalNullableField(~name="ownerId", ApiScalars.Uuid.schema)')
+    expect(defaultModule).toContain("sessionId: Hybit.Id.t,")
+    expect(defaultModule).toContain("schema: OpenapiRescriptRuntime.Schema.toAny(ApiScalars.Uuid.schema)")
+  })
+
   it("annotates enum decode constructors when multiple generated variants share constructor names", () => {
     let fixture = {
       openapi: "3.1.0",

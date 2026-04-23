@@ -11,8 +11,8 @@ let main = async () => {
       Node.process.stderr->Node.write(JSON.stringifyAny(diagnostic)->Option.getUnsafe)
       Node.process->Node.exit(1)
     }
-  | Ok({inputPath, targetDir, options}) => {
-      let s = await RunCore.runCore(inputPath, ~targetDir, ~options)
+  | Ok({inputPath, targetDir, options, configPath}) => {
+      let s = await RunCore.runCore(inputPath, ~targetDir, ~options, ~configPath?)
 
       if !s.ok {
         Node.process.stderr->Node.write(JSON.stringifyAny(s.diagnostic)->Option.getUnsafe)
