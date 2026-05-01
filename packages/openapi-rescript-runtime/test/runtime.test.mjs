@@ -230,6 +230,64 @@ describe("openapi-rescript-runtime", () => {
     expect(result).toEqual(ok({id: 7, name: "Ada"}))
   })
 
+  it("serializes optional nullable request-body variants from their generated model representation", async () => {
+    let fetchMock = vi.fn(async (_url, init) => {
+      expect(init.method).toBe("POST")
+      expect(init.headers.get("content-type")).toBe("application/json")
+      expect(JSON.parse(init.body)).toEqual({
+        sex: {
+          kind: "Male",
+        },
+      })
+
+      return new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {"content-type": "application/json"},
+      })
+    })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    let {Client, Schema} = await loadRuntime()
+    let client = Client.make({
+      baseUrl: "https://example.test",
+      auth: [],
+      defaultHeaders: [],
+    })
+    let sexSchema = Schema.discriminatedUnion("kind", [
+        {
+          tag: "Male",
+          schema: Schema.object_([]),
+          wrap: _payload => "Male",
+          unwrap: value => (value === "Male" ? {} : undefined),
+        },
+        {
+          tag: "Female",
+          schema: Schema.object_([Schema.field({name: "value", required: true}, Schema.string)]),
+          wrap: payload => ({TAG: "Female", _0: payload}),
+          unwrap: value => (value?.TAG === "Female" ? value._0 : undefined),
+        },
+      ])
+    let operation = {
+      name: "saveUser",
+      method: "post",
+      path: "/users",
+      parameters: [],
+      requestBody: {
+        required: true,
+        schema: Schema.object_([Schema.makeOptionalNullableField("sex", sexSchema)]),
+      },
+      responses: [{statusCode: "200", schema: Schema.object_([Schema.field({name: "ok", required: true}, Schema.bool)])}],
+      security: [],
+      securitySchemes: [],
+    }
+
+    let result = await Client.callJson(client, operation, {body: {sex: "Male"}})
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual(ok({ok: true}))
+  })
+
   it("injects supported auth schemes into header, query, and cookie locations", async () => {
     let capturedUrls = []
     let capturedCookieHeaders = []

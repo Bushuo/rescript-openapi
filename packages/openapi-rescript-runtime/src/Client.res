@@ -109,7 +109,9 @@ let resolveSecurityRequirement = (client: t, operation: jsonOperation): option<a
   )
 
 let reverseJsonString = (value: unknown, schema: Schema.any): string =>
-  S.reverseConvertToJsonStringOrThrow(value, schema)
+  S.compile(schema, ~input=S.Value, ~output=S.Json, ~mode=S.Sync, ~typeValidation=true)(value)
+  ->JSON.stringifyAny
+  ->Option.getOr("")
 
 let scalarToString = (json: JSON.t): string =>
   switch JSON.Decode.string(json) {
@@ -246,8 +248,7 @@ let encodeRequestBody = (
       }
     | Some(body) =>
       try {
-        let validated = S.parseOrThrow(body, requestBody.schema)
-        let encoded = reverseJsonString(validated, requestBody.schema)
+        let encoded = reverseJsonString(body, requestBody.schema)
         headers->Fetch.Headers.set("content-type", "application/json")
         Ok(Some(Fetch.Body.string(encoded)))
       } catch {
