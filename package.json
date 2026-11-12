@@ -9,10 +9,11 @@
     "check": "pnpm -r check"
   },
   "devDependencies": {
+    "@rescript/runtime": "^12.3.1",
     "openapi-rescript-cli": "workspace:*",
     "openapi-rescript-core": "workspace:*",
     "openapi-rescript-runtime": "workspace:*",
-    "rescript": "^12.2.0",
-    "vitest": "^3.2.4"
+    "rescript": "^12.3.1",
+    "vitest": "^5.1.0"
   }
 }

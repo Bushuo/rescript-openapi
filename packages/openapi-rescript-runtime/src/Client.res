@@ -108,8 +108,9 @@ let resolveSecurityRequirement = (client: t, operation: jsonOperation): option<a
     isRequirementSatisfied(client, operation, requirement)
   )
 
+// Sury conversion trusts output values; validate untyped request data before encoding.
 let reverseJsonString = (value: unknown, schema: Schema.any): string =>
-  S.compile(schema, ~input=S.Value, ~output=S.Json, ~mode=S.Sync, ~typeValidation=true)(value)
+  S.convertOrThrow(S.makeOrThrow(value, ~schema), ~from=schema, ~to=S.json)
   ->JSON.stringifyAny
   ->Option.getOr("")
 
@@ -371,7 +372,7 @@ let finishJsonRequest: (
     | (true, Some({schema: Some(schema)})) =>
       try {
         let responseSchema: Schema.any = Obj.magic(schema)
-        Ok(Obj.magic(S.parseJsonStringOrThrow(responseText, responseSchema)))
+        Ok(Obj.magic(S.parseOrThrow(responseText, ~to=S.to(S.jsonString, responseSchema))))
       } catch {
       | error =>
         Error(

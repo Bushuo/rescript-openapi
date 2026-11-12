@@ -12,8 +12,16 @@
     "rescript.json"
   ],
   "dependencies": {
-    "@glennsl/rescript-fetch": "0.2.3",
+    "@glennsl/rescript-fetch": "0.3.0",
+    "sury": "11.1.0"
+  },
+  "peerDependencies": {
     "@rescript/runtime": "^12.2.0",
-    "sury": "11.0.0-alpha.4"
+    "rescript": "12.x"
+  },
+  "peerDependenciesMeta": {
+    "rescript": {
+      "optional": true
+    }
   }
 }
