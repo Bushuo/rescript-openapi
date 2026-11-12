@@ -1,5 +1,6 @@
 {
   "name": "openapi-rescript-cli",
+  "license": "MIT",
   "private": false,
   "version": "0.0.1-rc.10",
   "bin": {
