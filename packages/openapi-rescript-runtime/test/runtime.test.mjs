@@ -1,15 +1,18 @@
 import {beforeEach, describe, expect, it, vi} from "vitest"
+import S from "../node_modules/sury/index.js"
+
+const decodeJson = (input, schema) => S.decodeOrThrow(S.jsonString, schema, input)
+const encodeJson = (value, schema) => JSON.stringify(S.encodeOrThrow(schema, S.json, value))
 
 const loadRuntime = async () => {
-  let [Client, OperationError, Schema, Scalar, S] = await Promise.all([
+  let [Client, OperationError, Schema, Scalar] = await Promise.all([
     import("../src/Client.bs.js"),
     import("../src/OperationError.bs.js"),
     import("../src/Schema.bs.js"),
     import("../src/Scalar.bs.js"),
-    import("../node_modules/sury/src/S.bs.js"),
   ])
 
-  return {Client, OperationError, Schema, Scalar, S}
+  return {Client, OperationError, Schema, Scalar}
 }
 
 const ok = value => ({TAG: "Ok", _0: value})
@@ -22,7 +25,7 @@ describe("openapi-rescript-runtime", () => {
   })
 
   it("maps string schemas through custom enum codecs", async () => {
-    let {Schema, S} = await loadRuntime()
+    let {Schema} = await loadRuntime()
 
     let active = {TAG: "Active"}
     let unknown = value => ({TAG: "Unknown", _0: value})
@@ -35,29 +38,29 @@ describe("openapi-rescript-runtime", () => {
       _value => "Active",
     )
 
-    expect(S.parseJsonStringOrThrow(JSON.stringify("Active"), openStatusSchema)).toEqual(active)
-    expect(S.parseJsonStringOrThrow(JSON.stringify("Paused"), openStatusSchema)).toEqual(unknown("Paused"))
-    expect(() => S.parseJsonStringOrThrow(JSON.stringify("Paused"), closedStatusSchema)).toThrow(
+    expect(decodeJson(JSON.stringify("Active"), openStatusSchema)).toEqual(active)
+    expect(decodeJson(JSON.stringify("Paused"), openStatusSchema)).toEqual(unknown("Paused"))
+    expect(() => decodeJson(JSON.stringify("Paused"), closedStatusSchema)).toThrow(
       /Unexpected enum value: Paused/,
     )
-    expect(S.reverseConvertToJsonStringOrThrow(active, openStatusSchema)).toBe(JSON.stringify("Active"))
-    expect(S.reverseConvertToJsonStringOrThrow(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
+    expect(encodeJson(active, openStatusSchema)).toBe(JSON.stringify("Active"))
+    expect(encodeJson(unknown("Paused"), openStatusSchema)).toBe(JSON.stringify("Paused"))
   })
 
   it("builds string scalar schemas with the scalar functor", async () => {
-    let {Scalar, S} = await loadRuntime()
+    let {Scalar} = await loadRuntime()
     let Uuid = Scalar.MakeString({
       decode: value => (value.startsWith("id_") ? ok({value}) : error("Invalid UUID")),
       encode: uuid => uuid.value,
     })
 
-    expect(S.parseJsonStringOrThrow(JSON.stringify("id_123"), Uuid.schema)).toEqual({
+    expect(decodeJson(JSON.stringify("id_123"), Uuid.schema)).toEqual({
       value: "id_123",
     })
-    expect(() => S.parseJsonStringOrThrow(JSON.stringify("bad"), Uuid.schema)).toThrow(
+    expect(() => decodeJson(JSON.stringify("bad"), Uuid.schema)).toThrow(
       /Invalid UUID/,
     )
-    expect(S.reverseConvertToJsonStringOrThrow({value: "id_456"}, Uuid.schema)).toBe(
+    expect(encodeJson({value: "id_456"}, Uuid.schema)).toBe(
       JSON.stringify("id_456"),
     )
   })
@@ -98,38 +101,49 @@ describe("openapi-rescript-runtime", () => {
     })
   })
 
+  it("round-trips nullable schemas as ReScript options", async () => {
+    let {Schema} = await loadRuntime()
+    let nullableString = Schema.nullableAsOption(Schema.string)
+
+    expect(decodeJson("null", nullableString)).toBeUndefined()
+    expect(decodeJson(JSON.stringify("Ada"), nullableString)).toBe("Ada")
+    expect(encodeJson(undefined, nullableString)).toBe("null")
+    expect(encodeJson("Ada", nullableString)).toBe(JSON.stringify("Ada"))
+    expect(() => decodeJson("42", nullableString)).toThrow()
+  })
+
   it("decodes nullable schemas as Null.t values", async () => {
-    let {Schema, S} = await loadRuntime()
+    let {Schema} = await loadRuntime()
     let nullableString = Schema.nullableAsNull(Schema.string)
 
-    expect(S.parseJsonStringOrThrow("null", nullableString)).toBeNull()
-    expect(S.parseJsonStringOrThrow(JSON.stringify("Ada"), nullableString)).toBe("Ada")
-    expect(S.reverseConvertToJsonStringOrThrow(null, nullableString)).toBe("null")
-    expect(S.reverseConvertToJsonStringOrThrow("Ada", nullableString)).toBe(JSON.stringify("Ada"))
+    expect(decodeJson("null", nullableString)).toBeNull()
+    expect(decodeJson(JSON.stringify("Ada"), nullableString)).toBe("Ada")
+    expect(encodeJson(null, nullableString)).toBe("null")
+    expect(encodeJson("Ada", nullableString)).toBe(JSON.stringify("Ada"))
   })
 
   it("decodes optional nullable object fields as Nullable.t values", async () => {
-    let {Schema, S} = await loadRuntime()
+    let {Schema} = await loadRuntime()
     let profileSchema = Schema.object_([Schema.makeOptionalNullableField("nickname", Schema.string)])
 
-    expect(S.parseJsonStringOrThrow("{}", profileSchema)).toEqual({nickname: undefined})
-    expect(S.parseJsonStringOrThrow(JSON.stringify({nickname: null}), profileSchema)).toEqual({
+    expect(decodeJson("{}", profileSchema)).toEqual({nickname: undefined})
+    expect(decodeJson(JSON.stringify({nickname: null}), profileSchema)).toEqual({
       nickname: null,
     })
-    expect(S.parseJsonStringOrThrow(JSON.stringify({nickname: "Ada"}), profileSchema)).toEqual({
+    expect(decodeJson(JSON.stringify({nickname: "Ada"}), profileSchema)).toEqual({
       nickname: "Ada",
     })
-    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: undefined}, profileSchema))).toEqual({})
-    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: null}, profileSchema))).toEqual({
+    expect(JSON.parse(encodeJson({nickname: undefined}, profileSchema))).toEqual({})
+    expect(JSON.parse(encodeJson({nickname: null}, profileSchema))).toEqual({
       nickname: null,
     })
-    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({nickname: "Ada"}, profileSchema))).toEqual({
+    expect(JSON.parse(encodeJson({nickname: "Ada"}, profileSchema))).toEqual({
       nickname: "Ada",
     })
   })
 
   it("decodes and re-encodes discriminated unions", async () => {
-    let {Schema, S} = await loadRuntime()
+    let {Schema} = await loadRuntime()
 
     let genderSchema = Schema.discriminatedUnion("kind", [
         {
@@ -146,19 +160,19 @@ describe("openapi-rescript-runtime", () => {
         },
       ])
 
-    expect(S.parseJsonStringOrThrow(JSON.stringify({kind: "Male"}), genderSchema)).toEqual({TAG: "Male"})
+    expect(decodeJson(JSON.stringify({kind: "Male"}), genderSchema)).toEqual({TAG: "Male"})
     expect(
-      S.parseJsonStringOrThrow(JSON.stringify({kind: "Female", value: true}), genderSchema),
+      decodeJson(JSON.stringify({kind: "Female", value: true}), genderSchema),
     ).toEqual({
       TAG: "Female",
       _0: {value: true},
     })
-    expect(JSON.parse(S.reverseConvertToJsonStringOrThrow({TAG: "Male"}, genderSchema))).toEqual({
+    expect(JSON.parse(encodeJson({TAG: "Male"}, genderSchema))).toEqual({
       kind: "Male",
     })
     expect(
       JSON.parse(
-        S.reverseConvertToJsonStringOrThrow({TAG: "Female", _0: {value: true}}, genderSchema),
+        encodeJson({TAG: "Female", _0: {value: true}}, genderSchema),
       ),
     ).toEqual({
       kind: "Female",
@@ -167,7 +181,7 @@ describe("openapi-rescript-runtime", () => {
   })
 
   it("reports missing and unknown discriminators precisely", async () => {
-    let {Schema, S} = await loadRuntime()
+    let {Schema} = await loadRuntime()
 
     let genderSchema = Schema.discriminatedUnion("kind", [
         {
@@ -178,8 +192,8 @@ describe("openapi-rescript-runtime", () => {
         },
       ])
 
-    expect(() => S.parseJsonStringOrThrow(JSON.stringify({}), genderSchema)).toThrow(/kind/)
-    expect(() => S.parseJsonStringOrThrow(JSON.stringify({kind: "Female"}), genderSchema)).toThrow(
+    expect(() => decodeJson(JSON.stringify({}), genderSchema)).toThrow(/kind/)
+    expect(() => decodeJson(JSON.stringify({kind: "Female"}), genderSchema)).toThrow(
       /Unknown discriminator value/,
     )
   })
@@ -228,6 +242,32 @@ describe("openapi-rescript-runtime", () => {
     let result = await Client.callJson(client, createUser, {body: {name: "Ada"}})
 
     expect(result).toEqual(ok({id: 7, name: "Ada"}))
+  })
+
+  it("encodes scalar JSON bodies and rejects invalid values before fetching", async () => {
+    let {Client, Schema} = await loadRuntime()
+    let fetchMock = vi.fn(async () => new Response(JSON.stringify("saved"), {status: 200}))
+    vi.stubGlobal("fetch", fetchMock)
+
+    let client = Client.make({baseUrl: "https://example.test", auth: [], defaultHeaders: []})
+    let operation = {
+      name: "saveName",
+      method: "post",
+      path: "/name",
+      parameters: [],
+      requestBody: {required: true, schema: Schema.string},
+      responses: [{statusCode: "200", schema: Schema.string}],
+      security: [],
+      securitySchemes: [],
+    }
+
+    expect(await Client.callJson(client, operation, {body: "Ada"})).toEqual(ok("saved"))
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify("Ada"))
+
+    expect(await Client.callJson(client, operation, {body: 42})).toEqual(
+      error(poly("requestEncoding", expect.objectContaining({operationName: "saveName"}))),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it("serializes optional nullable request-body variants from their generated model representation", async () => {

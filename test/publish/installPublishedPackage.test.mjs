@@ -45,7 +45,7 @@ function packPackage(packageDir, tarballDir) {
   }
 }
 
-function writeConsumerFixture(appDir, tarballPaths) {
+function writeConsumerFixture(appDir, tarballPaths, rescriptVersion, runtimeVersion) {
   mkdirSync(join(appDir, "src"), {recursive: true})
   writeFileSync(join(appDir, "openapi.yaml"), readFileSync(petstoreSpecPath, "utf8"))
   writeJson(join(appDir, "package.json"), {
@@ -54,7 +54,8 @@ function writeConsumerFixture(appDir, tarballPaths) {
     version: "0.0.0",
     dependencies: {
       "@bushuo/openapi-rescript-runtime": tarballPaths.runtime,
-      rescript: "12.2.0",
+      "@rescript/runtime": runtimeVersion,
+      rescript: rescriptVersion,
     },
     devDependencies: {
       "@bushuo/openapi-rescript-core": tarballPaths.core,
@@ -85,6 +86,15 @@ function withoutNpmConfigEnv(env) {
 }
 
 describe("published package install", () => {
+  it("shares the consumer's ReScript runtime through a peer dependency", () => {
+    for (const name of ["runtime", "core", "cli"]) {
+      const manifest = JSON.parse(readFileSync(resolve(`packages/openapi-rescript-${name}/package.json`), "utf8"))
+      expect(manifest.peerDependencies).toEqual({"@rescript/runtime": "^12.2.0", rescript: "12.x"})
+      expect(manifest.peerDependenciesMeta).toEqual({rescript: {optional: true}})
+      expect(manifest.dependencies ?? {}).not.toHaveProperty("@rescript/runtime")
+    }
+  })
+
   it("drops inherited npm config env vars before invoking npm", () => {
     expect(
       withoutNpmConfigEnv({
@@ -100,9 +110,13 @@ describe("published package install", () => {
     })
   })
 
-  it(
-    "stages, packs, installs, generates, and compiles a consumer app",
-    () => {
+  it.each([
+    ["12.0.0", "12.2.0"],
+    ["12.2.0", "12.2.0"],
+    ["12.3.1", "12.3.1"],
+  ])(
+    "stages, packs, installs, generates, and compiles with ReScript %s and runtime %s",
+    (rescriptVersion, runtimeVersion) => {
       const rootDir = mkdtempSync(join(tmpdir(), "openapi-rescript-published-install-"))
       const stagedDir = join(rootDir, "staged")
       const tarballDir = join(rootDir, "tarballs")
@@ -132,21 +146,25 @@ describe("published package install", () => {
           runtime: runtimePack.tarballPath,
           core: corePack.tarballPath,
           cli: cliPack.tarballPath,
-        })
+        }, rescriptVersion, runtimeVersion)
 
         const installResult = run("npm", ["install"], {
           cwd: appDir,
           env: withoutNpmConfigEnv(process.env),
         })
-        expect(installResult.exitCode).toBe(0)
+        expect(installResult.exitCode, installResult.stderr).toBe(0)
         expect(installResult.stderr).toBe("")
+        for (const [name, version] of [["rescript", rescriptVersion], ["@rescript/runtime", runtimeVersion]]) {
+          const installed = JSON.parse(readFileSync(join(appDir, "node_modules", name, "package.json"), "utf8"))
+          expect(installed.version).toBe(version)
+        }
 
         const generateResult = run(
           "node",
           [join(appDir, "node_modules", ".bin", "openapi-rescript"), join(appDir, "openapi.yaml"), join(appDir, "src", "generated")],
           {cwd: appDir}
         )
-        expect(generateResult.exitCode).toBe(0)
+        expect(generateResult.exitCode, generateResult.stderr).toBe(0)
         expect(generateResult.stdout).toBe("")
         expect(generateResult.stderr).toBe("")
 
@@ -166,7 +184,7 @@ describe("published package install", () => {
         ].join("\n"))
 
         const buildResult = run("node", [join(appDir, "node_modules", ".bin", "rescript"), "build"], {cwd: appDir})
-        expect(buildResult.exitCode).toBe(0)
+        expect(buildResult.exitCode, buildResult.stderr).toBe(0)
         expect(buildResult.stderr).toBe("")
       } finally {
         rmSync(rootDir, {recursive: true, force: true})

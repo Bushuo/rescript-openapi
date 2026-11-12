@@ -22,7 +22,7 @@ Generated clients depend on:
 
 - `@bushuo/openapi-rescript-runtime` (the published GitHub Packages runtime; the workspace package remains `openapi-rescript-runtime`)
 - `@glennsl/rescript-fetch`
-- `sury@11.0.0-alpha.4`
+- `sury@11.1.0`
 
 ## Publishing
 

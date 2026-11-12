@@ -16,6 +16,8 @@ node packages/openapi-rescript-cli/bin/openapi-rescript.mjs [--enum-mode=open|cl
 
 ## Install
 
+Use Node.js 24 (as in CI) and pnpm 10.33.0. Vitest 5 requires Node.js `^22.12.0 || ^24.0.0 || >=26.0.0`.
+
 ```bash
 pnpm install
 ```
@@ -88,7 +90,7 @@ Expected output files:
 Run the workspace test suite with the same arguments used by the repo CI flow:
 
 ```bash
-pnpm test -- --runInBand
+pnpm test
 ```
 
 ## Generated Client Dependencies
@@ -97,7 +99,17 @@ Generated clients import the shared runtime package and its schema/HTTP dependen
 
 - `@bushuo/openapi-rescript-runtime`
 - `@glennsl/rescript-fetch`
-- `sury@11.0.0-alpha.4`
+- `sury@11.1.0`
+
+`@rescript/runtime` is a required peer dependency (`^12.2.0`), supplied by the consuming project. `rescript` is an optional peer dependency (`12.x`), needed when compiling ReScript sources. Install the JavaScript runtime explicitly alongside the client runtime:
+
+```bash
+pnpm add @bushuo/openapi-rescript-runtime @rescript/runtime@^12.2.0
+```
+
+The compiler peer accepts any stable ReScript 12 release; only the JavaScript runtime must be at least 12.2.0. Runtime releases 12.0.0 through 12.1.0 fail to load the packaged CommonJS CLI because their CommonJS `.js` files are treated as ES modules. Upgrading the runtime does not require upgrading the compiler.
+
+Packaged-consumer tests cover compiler/runtime pairs 12.0.0/12.2.0, 12.2.0/12.2.0, and 12.3.1/12.3.1, and check that installation preserves both pinned versions.
 
 Inside this repository, the corresponding workspace package is still named `openapi-rescript-runtime`.
 
